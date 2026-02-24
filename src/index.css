@@ -1,0 +1,150 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Light Mode */
+    --background: 0 0% 98%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+    --primary: 47 100% 50%;
+    /* Gold #FFD24D */
+    --primary-foreground: 240 5.9% 10%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 5.9% 85%;
+    /* Slightly darker for recognition */
+    --input: 240 5.9% 90%;
+    --ring: 47 100% 50%;
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    /* Dark Mode - Premium Rich Black & Gold */
+    --background: 240 10% 3.9%;
+    /* #0A0A0B - Deep Matte Black */
+    --foreground: 0 0% 98%;
+
+    --card: 240 10% 5.9%;
+    /* #111113 - Slightly Lighter Black */
+    --card-foreground: 0 0% 98%;
+
+    --popover: 240 10% 5.9%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 45 100% 55%;
+    /* #FFC300 - Richer Gold/Amber */
+    --primary-foreground: 240 5.9% 10%;
+
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 3.7% 15.9%;
+    /* Low contrast for subtle separation */
+    --input: 240 3.7% 15.9%;
+    --ring: 45 100% 55%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased overflow-x-hidden font-sans;
+    /* Subtle premium noise/gradient background - cleaned up */
+    background-image:
+      radial-gradient(circle at top right, rgba(255, 195, 0, 0.05), transparent 40%),
+      radial-gradient(circle at bottom left, rgba(255, 195, 0, 0.03), transparent 40%);
+    background-attachment: fixed;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-heading;
+  }
+}
+
+@layer components {
+  .glass {
+    @apply bg-background/70 backdrop-blur-xl border-b border-border supports-[backdrop-filter]:bg-background/40;
+  }
+
+  .glass-card {
+    @apply bg-card/60 backdrop-blur-md border border-border shadow-lg supports-[backdrop-filter]:bg-card/40;
+  }
+
+  .dark .glass-card {
+    @apply bg-[#15171C]/90 border-white/10 shadow-2xl;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  }
+
+  .card-premium {
+    @apply bg-gradient-to-br from-card/80 to-card/40 border border-border;
+  }
+
+  .dark .card-premium {
+    @apply border-white/10 bg-[#15171C]/95;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 210, 77, 0.1);
+  }
+
+  .btn-premium {
+    @apply relative overflow-hidden hover:shadow-lg hover:shadow-primary/25;
+  }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-br from-[#FFD24D] via-[#FFC000] to-[#FFAA00] drop-shadow-sm;
+  }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: #0F1115;
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 10px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #2D3139;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--primary));
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #FFD24D;
+}

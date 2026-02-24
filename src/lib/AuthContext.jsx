@@ -1,0 +1,108 @@
+import React, { createContext, useState, useContext, useEffect } from 'react';
+import { base44 } from '@/api/base44Client';
+import { isSessionValid } from '@/lib/security';
+
+const AuthContext = createContext();
+
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+
+  useEffect(() => {
+    checkUserAuth();
+
+    // Check session timeout every minute
+    const sessionCheckInterval = setInterval(async () => {
+      const sessionStr = localStorage.getItem('bielenet_auth');
+      if (sessionStr) {
+        try {
+          const session = JSON.parse(sessionStr);
+          if (!isSessionValid(session)) {
+            console.log('[AuthContext] Session expired, logging out');
+            logout();
+          }
+        } catch (e) {
+          console.error('[AuthContext] Error checking session:', e);
+        }
+      }
+    }, 60000); // Check every minute
+
+    // Listen for logout events from other tabs
+    const handleStorageChange = (e) => {
+      if (e.key === 'logout_event') {
+        console.log('[AuthContext] Logout event from another tab detected');
+        setUser(null);
+        setIsAuthenticated(false);
+        window.location.reload();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      clearInterval(sessionCheckInterval);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
+
+  const checkUserAuth = async () => {
+    console.log('[AuthContext] checkUserAuth START');
+    try {
+      setIsLoadingAuth(true);
+      const currentUser = await base44.auth.me();
+      console.log('[AuthContext] User found:', currentUser);
+      setUser(currentUser);
+      setIsAuthenticated(true);
+    } catch (error) {
+      console.log('[AuthContext] Not logged in (caught error):', error);
+      setIsAuthenticated(false);
+      setUser(null);
+    } finally {
+      console.log('[AuthContext] checkUserAuth FINALLY -> setIsLoadingAuth(false)');
+      setIsLoadingAuth(false);
+    }
+  };
+
+  const login = async (email, password) => {
+    const result = await base44.auth.login(email, password);
+    if (result.success) {
+      await checkUserAuth();
+      return true;
+    }
+    return result; // returning need for 2FA
+  };
+
+  const verify2FA = async (userId, token) => {
+    await base44.auth.verify2FA(userId, token);
+    await checkUserAuth();
+    return true;
+  };
+
+  const logout = () => {
+    base44.auth.logout();
+    setUser(null);
+    setIsAuthenticated(false);
+  };
+
+  return (
+    <AuthContext.Provider value={{
+      user,
+      isAuthenticated,
+      isLoadingAuth,
+      login,
+      logout,
+      verify2FA
+    }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
