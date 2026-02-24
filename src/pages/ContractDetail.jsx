@@ -27,6 +27,7 @@ import { downloadBlob, createBlobURL, revokeBlobURL } from "@/components/pdf/dow
 import { toast } from "sonner";
 import { FloatingActionButton } from "@/components/ui/floating-action-button";
 import { useIsMobile } from "@/lib/hooks/useMediaQuery";
+import { validateContractData } from "@/lib/validators";
 
 const DEFAULT_NOTICE_PERIOD_DAYS = 30;
 
@@ -79,6 +80,7 @@ export default function ContractDetail() {
     end_date: null,
     cancellation_deadline: null
   });
+  const [errors, setErrors] = useState({});
 
   const { data: contract } = useQuery({
     queryKey: ['contract', contractId],
@@ -423,7 +425,60 @@ export default function ContractDetail() {
     }
   });
 
+  const focusFirstError = (errorMap) => {
+    const order = ["customer_id", "contract_number", "contract_duration_months", "category"];
+    const first = order.find((k) => errorMap[k]);
+    if (first) {
+      setTimeout(() => {
+        const el = document.getElementById(first) || document.querySelector(`[name=\"${first}\"]`);
+        if (el?.focus) el.focus();
+      }, 0);
+    }
+  };
+
+  const validateContractForm = () => {
+    const newErrors = {};
+    if (!formData.customer_id) newErrors.customer_id = "Kunde auswählen";
+    if (!formData.contract_number?.trim()) newErrors.contract_number = "Vertragsnummer ist Pflicht";
+    if (!formData.contract_duration_months) newErrors.contract_duration_months = "Laufzeit wählen";
+    if (!formData.category) newErrors.category = "Kategorie auswählen";
+
+    try {
+      validateContractData({
+        contract_number: formData.contract_number,
+        tariff_name: formData.tariff_name,
+        tariff_details: formData.tariff_details
+      });
+    } catch (err) {
+      const msg = err?.message || "";
+      if (!newErrors.contract_number && msg.toLowerCase().includes("vertragsnummer")) {
+        newErrors.contract_number = msg;
+      }
+      if (!newErrors.tariff_name && msg.toLowerCase().includes("tarifname")) {
+        newErrors.tariff_name = msg;
+      }
+    }
+    return newErrors;
+  };
+
+  const handleFieldChange = (field, value) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    if (errors[field]) {
+      const { [field]: _, ...rest } = errors;
+      setErrors(rest);
+    }
+  };
+
   const handleSave = () => {
+    const validationErrors = validateContractForm();
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      focusFirstError(validationErrors);
+      toast.error("Bitte Pflichtfelder prüfen");
+      return;
+    }
+    setErrors({});
+
     if (isNew) {
       createMutation.mutate(formData);
     } else {
@@ -752,8 +807,11 @@ export default function ContractDetail() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <Label className="text-[#EAECEF]">Kunde *</Label>
-            <Select value={formData.customer_id} onValueChange={(v) => setFormData({ ...formData, customer_id: v })}>
-              <SelectTrigger className="mt-2 bg-[#1F2228] border-[#2D3139] text-[#EAECEF]">
+            <Select value={formData.customer_id} onValueChange={(v) => handleFieldChange("customer_id", v)}>
+              <SelectTrigger
+                id="customer_id"
+                className={cn("mt-2 bg-[#1F2228] border-[#2D3139] text-[#EAECEF]", errors.customer_id && "border-red-500")}
+              >
                 <SelectValue placeholder="Kunde wählen..." />
               </SelectTrigger>
               <SelectContent className="bg-[#1F2228] border-[#2D3139]">
@@ -764,6 +822,7 @@ export default function ContractDetail() {
                 ))}
               </SelectContent>
             </Select>
+            {errors.customer_id && <p className="text-xs text-red-500 mt-1">{errors.customer_id}</p>}
           </div>
 
           <div>
@@ -782,8 +841,11 @@ export default function ContractDetail() {
 
           <div>
             <Label className="text-[#EAECEF]">Kategorie *</Label>
-            <Select value={formData.category} onValueChange={(v) => setFormData({ ...formData, category: v })}>
-              <SelectTrigger className="mt-2 bg-[#1F2228] border-[#2D3139] text-[#EAECEF]">
+            <Select value={formData.category} onValueChange={(v) => handleFieldChange("category", v)}>
+              <SelectTrigger
+                id="category"
+                className={cn("mt-2 bg-[#1F2228] border-[#2D3139] text-[#EAECEF]", errors.category && "border-red-500")}
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-[#1F2228] border-[#2D3139]">
@@ -794,6 +856,7 @@ export default function ContractDetail() {
                 <SelectItem value="sonstiges" className="text-[#EAECEF]">Sonstiges</SelectItem>
               </SelectContent>
             </Select>
+            {errors.category && <p className="text-xs text-red-500 mt-1">{errors.category}</p>}
           </div>
 
           <div>
@@ -820,19 +883,23 @@ export default function ContractDetail() {
             <Label className="text-[#EAECEF]">Startdatum *</Label>
             <Input
               type="date"
+              name="start_date"
               value={formData.start_date}
-              onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+              onChange={(e) => handleFieldChange("start_date", e.target.value)}
               className="mt-2 bg-[#1F2228] border-[#2D3139] text-[#EAECEF]"
             />
           </div>
 
           <div>
-            <Label className="text-[#EAECEF]">Laufzeit</Label>
+            <Label className="text-[#EAECEF]">Laufzeit *</Label>
             <Select
               value={formData.contract_duration_months?.toString() || "24"}
-              onValueChange={(v) => setFormData({ ...formData, contract_duration_months: parseInt(v) })}
+              onValueChange={(v) => handleFieldChange("contract_duration_months", parseInt(v))}
             >
-              <SelectTrigger className="mt-2 bg-[#1F2228] border-[#2D3139] text-[#EAECEF]">
+              <SelectTrigger
+                id="contract_duration_months"
+                className={cn("mt-2 bg-[#1F2228] border-[#2D3139] text-[#EAECEF]", errors.contract_duration_months && "border-red-500")}
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-[#1F2228] border-[#2D3139]">
@@ -842,6 +909,7 @@ export default function ContractDetail() {
                 <SelectItem value="36" className="text-[#EAECEF]">36 Monate</SelectItem>
               </SelectContent>
             </Select>
+            {errors.contract_duration_months && <p className="text-xs text-red-500 mt-1">{errors.contract_duration_months}</p>}
           </div>
 
           <div>
@@ -894,7 +962,14 @@ export default function ContractDetail() {
       <ContractFormFields
         category={formData.category}
         formData={formData}
-        onChange={(newData) => setFormData(newData)}
+        errors={errors}
+        onChange={(newData) => {
+          setFormData(newData);
+          if (errors.contract_number && newData.contract_number) {
+            const { contract_number, ...rest } = errors;
+            setErrors(rest);
+          }
+        }}
       />
 
       {/* Kosten */}

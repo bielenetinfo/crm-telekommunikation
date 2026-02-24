@@ -3,9 +3,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import { Smartphone, Wifi } from "lucide-react";
 
-export default function ContractFormFields({ category, formData, onChange }) {
+export default function ContractFormFields({ category, formData, onChange, errors = {} }) {
   const updateField = (field, value) => {
     onChange({ ...formData, [field]: value });
   };
@@ -21,6 +22,7 @@ export default function ContractFormFields({ category, formData, onChange }) {
               Tarifname {(category === "mobilfunk" || category === "festnetz_internet") && <span className="text-rose-400">*</span>}
             </Label>
             <Input
+              name="tariff_name"
               value={formData.tariff_name || ""}
               onChange={(e) => updateField('tariff_name', e.target.value)}
               className="mt-2 bg-[#1F2228] border-[#2D3139] text-[#EAECEF]"
@@ -30,11 +32,13 @@ export default function ContractFormFields({ category, formData, onChange }) {
           <div>
             <Label className="text-[#EAECEF]">Vertragsnummer</Label>
             <Input
+              name="contract_number"
               value={formData.contract_number || ""}
               onChange={(e) => updateField('contract_number', e.target.value)}
-              className="mt-2 bg-[#1F2228] border-[#2D3139] text-[#EAECEF]"
+              className={cn("mt-2 bg-[#1F2228] border-[#2D3139] text-[#EAECEF]", errors.contract_number && "border-red-500")}
               placeholder="Optional – kann später ergänzt werden"
             />
+            {errors.contract_number && <p className="text-xs text-red-500 mt-1">{errors.contract_number}</p>}
           </div>
         </div>
       </Card>

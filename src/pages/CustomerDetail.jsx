@@ -31,6 +31,7 @@ import { getAppointments, getOpenFollowups } from "@/components/utils/calendar";
 import { logDocumentUploaded } from "@/components/utils/historyLogger";
 import { FloatingActionButton } from "@/components/ui/floating-action-button";
 import { useIsMobile } from "@/lib/hooks/useMediaQuery";
+import { validateCustomerData } from "@/lib/validators";
 
 export default function CustomerDetail() {
   const navigate = useNavigate();
@@ -337,47 +338,80 @@ export default function CustomerDetail() {
     }
   }, [formData.phone, formData.address, formData.postal_code, allCustomers, isNew]);
 
+  const focusFirstError = (errorMap) => {
+    const order = [
+      "first_name",
+      "last_name",
+      "company_name",
+      "phone",
+      "street",
+      "postal_code",
+      "city",
+      "branch_id"
+    ];
+    const first = order.find((f) => errorMap[f]);
+    if (first) {
+      setTimeout(() => {
+        const el =
+          document.querySelector(`[name=\"${first}\"]`) ||
+          document.getElementById(first);
+        if (el && el.focus) el.focus();
+      }, 0);
+    }
+  };
+
+  const validateCustomerForm = () => {
+    const newErrors = {};
+
+    if (customerType === "privat") {
+      if (!formData.first_name?.trim()) newErrors.first_name = "Vorname ist Pflicht";
+      if (!formData.last_name?.trim()) newErrors.last_name = "Nachname ist Pflicht";
+    } else {
+      if (!formData.company_name?.trim()) newErrors.company_name = "Firmenname ist Pflicht";
+    }
+
+    if (!formData.phone?.trim()) newErrors.phone = "Telefonnummer ist Pflicht";
+    if (!addressData.street?.trim()) newErrors.street = "Straße fehlt";
+    if (!addressData.postal_code?.trim()) newErrors.postal_code = "PLZ fehlt";
+    if (!addressData.city?.trim()) newErrors.city = "Stadt fehlt";
+    if (!formData.branch_id) newErrors.branch_id = "Filiale auswählen";
+
+    // Format-Validierung (E-Mail etc.)
+    try {
+      validateCustomerData({
+        first_name: formData.first_name,
+        last_name: formData.last_name,
+        company_name: formData.company_name,
+        email: formData.email,
+        phone: formData.phone
+      });
+    } catch (err) {
+      const msg = err?.message || "";
+      if (msg.toLowerCase().includes("email")) {
+        newErrors.email = msg;
+      }
+    }
+
+    return newErrors;
+  };
+
   const handleSubmit = () => {
-    if (isNew && creationStep === 1) {
-      // Validation Check
-      const missing = [];
-      if (!formData.phone) missing.push("Telefonnummer");
-      if (!addressData.street) missing.push("Straße");
-      if (!addressData.postal_code) missing.push("PLZ");
-      if (!addressData.city) missing.push("Stadt");
-      if (!formData.branch_id) missing.push("Filiale");
-
-      if (customerType === "privat") {
-        if (!formData.first_name) missing.push("Vorname");
-        if (!formData.last_name) missing.push("Nachname");
-      } else {
-        if (!formData.company_name) missing.push("Firmenname");
-      }
-
-      if (missing.length > 0) {
-        toast.error(`Bitte füllen Sie folgende Pflichtfelder aus: ${missing.join(", ")}`);
-
-        // Set visual errors
-        const newErrors = {};
-        if (!formData.phone) newErrors.phone = true;
-        if (!addressData.street) newErrors.street = true;
-        if (!addressData.postal_code) newErrors.postal_code = true;
-        if (!addressData.city) newErrors.city = true;
-        if (!formData.branch_id) newErrors.branch_id = true;
-
-        if (customerType === "privat") {
-          if (!formData.first_name) newErrors.first_name = true;
-          if (!formData.last_name) newErrors.last_name = true;
-        } else {
-          if (!formData.company_name) newErrors.company_name = true;
-        }
-        setErrors(newErrors);
-        return;
-      }
-      setErrors({}); // Clear errors if valid
-      createDraftMutation.mutate(formData);
-    } else if (creationStep === 2 && customerId) {
+    if (creationStep === 2 && customerId) {
       completeDraftMutation.mutate();
+      return;
+    }
+
+    const validationErrors = validateCustomerForm();
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      focusFirstError(validationErrors);
+      toast.error("Bitte Pflichtfelder prüfen");
+      return;
+    }
+    setErrors({});
+
+    if (isNew && creationStep === 1) {
+      createDraftMutation.mutate(formData);
     } else {
       updateMutation.mutate(formData);
     }
@@ -684,37 +718,52 @@ export default function CustomerDetail() {
                             <div className="space-y-1.5">
                               <Label>Vorname <span className="text-[#FFD24D]">*</span></Label>
                               <Input
+                                name="first_name"
                                 value={formData.first_name}
                                 onChange={(e) => {
                                   setFormData({ ...formData, first_name: e.target.value });
-                                  if (errors.first_name) setErrors({ ...errors, first_name: false });
+                                  if (errors.first_name) {
+                                    const { first_name, ...rest } = errors;
+                                    setErrors(rest);
+                                  }
                                 }}
                                 className={cn("bg-[#1F2228]", errors.first_name && "border-red-500")}
                               />
+                              {errors.first_name && <p className="text-xs text-red-500 mt-1">{errors.first_name}</p>}
                             </div>
                             <div className="space-y-1.5">
                               <Label>Nachname <span className="text-[#FFD24D]">*</span></Label>
                               <Input
+                                name="last_name"
                                 value={formData.last_name}
                                 onChange={(e) => {
                                   setFormData({ ...formData, last_name: e.target.value });
-                                  if (errors.last_name) setErrors({ ...errors, last_name: false });
+                                  if (errors.last_name) {
+                                    const { last_name, ...rest } = errors;
+                                    setErrors(rest);
+                                  }
                                 }}
                                 className={cn("bg-[#1F2228]", errors.last_name && "border-red-500")}
                               />
+                              {errors.last_name && <p className="text-xs text-red-500 mt-1">{errors.last_name}</p>}
                             </div>
                           </>
                         ) : (
                           <div className="col-span-2 space-y-1.5">
                             <Label>Firmenname <span className="text-[#FFD24D]">*</span></Label>
                             <Input
+                              name="company_name"
                               value={formData.company_name}
                               onChange={(e) => {
                                 setFormData({ ...formData, company_name: e.target.value });
-                                if (errors.company_name) setErrors({ ...errors, company_name: false });
+                                if (errors.company_name) {
+                                  const { company_name, ...rest } = errors;
+                                  setErrors(rest);
+                                }
                               }}
                               className={cn("bg-[#1F2228]", errors.company_name && "border-red-500")}
                             />
+                            {errors.company_name && <p className="text-xs text-red-500 mt-1">{errors.company_name}</p>}
                           </div>
                         )}
                       </div>
@@ -730,25 +779,32 @@ export default function CustomerDetail() {
                           <Label>Telefon <span className="text-[#FFD24D]">*</span></Label>
                           <Input
                             type="tel"
+                            name="phone"
                             value={formData.phone}
                             onChange={(e) => {
                               let value = e.target.value.replace(/\s/g, '');
                               if (value.startsWith('0') && value.length > 4) value = value.slice(0, 4) + ' ' + value.slice(4);
                               setFormData({ ...formData, phone: value });
-                              if (errors.phone) setErrors({ ...errors, phone: false });
+                              if (errors.phone) {
+                                const { phone, ...rest } = errors;
+                                setErrors(rest);
+                              }
                             }}
                             className={cn("bg-[#1F2228]", errors.phone && "border-red-500")}
                             placeholder="0176..."
                           />
+                          {errors.phone && <p className="text-xs text-red-500 mt-1">{errors.phone}</p>}
                         </div>
                         <div className="space-y-1.5">
                           <Label>E-Mail</Label>
                           <Input
                             type="email"
+                            name="email"
                             value={formData.email}
                             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                            className="bg-[#1F2228]"
+                            className={cn("bg-[#1F2228]", errors.email && "border-red-500")}
                           />
+                          {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
                         </div>
                       </div>
                     </div>
@@ -788,7 +844,10 @@ export default function CustomerDetail() {
                               value={formData.branch_id}
                               onValueChange={(v) => setFormData({ ...formData, branch_id: v })}
                             >
-                              <SelectTrigger className={cn("w-full bg-[#1F2228]", errors.branch_id && "border-red-500")}>
+                              <SelectTrigger
+                                id="branch_id"
+                                className={cn("w-full bg-[#1F2228]", errors.branch_id && "border-red-500")}
+                              >
                                 <SelectValue placeholder="Filiale wählen..." />
                               </SelectTrigger>
                               <SelectContent className="bg-[#181B21] border-[#2D3139]">
@@ -798,6 +857,7 @@ export default function CustomerDetail() {
                               </SelectContent>
                             </Select>
                           )}
+                          {errors.branch_id && <p className="text-xs text-red-500 mt-1">{errors.branch_id}</p>}
                         </div>
                       </div>
                     </div>

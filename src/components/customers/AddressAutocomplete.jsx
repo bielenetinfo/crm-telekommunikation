@@ -234,6 +234,7 @@ export default function AddressAutocomplete({
         <div className="md:col-span-2">
           <Label className="text-[#EAECEF]">Straße *</Label>
           <Input
+            name="street"
             value={value.street}
             onChange={(e) => handleManualChange('street', e.target.value)}
             className={cn(
@@ -248,6 +249,7 @@ export default function AddressAutocomplete({
         <div>
           <Label className="text-[#EAECEF]">Hausnr. *</Label>
           <Input
+            name="house_number"
             value={value.house_number}
             onChange={(e) => handleManualChange('house_number', e.target.value)}
             className="mt-2 bg-[#1F2228] border-[#2D3139] text-[#EAECEF]"
@@ -258,6 +260,7 @@ export default function AddressAutocomplete({
         <div>
           <Label className="text-[#EAECEF]">PLZ *</Label>
           <Input
+            name="postal_code"
             value={value.postal_code}
             onChange={(e) => handleManualChange('postal_code', e.target.value)}
             className={cn(
@@ -274,6 +277,7 @@ export default function AddressAutocomplete({
       <div>
         <Label className="text-[#EAECEF]">Stadt *</Label>
         <Input
+          name="city"
           value={value.city}
           onChange={(e) => handleManualChange('city', e.target.value)}
           className={cn(
