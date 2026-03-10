@@ -21,6 +21,7 @@ import LoginPage from '@/pages/LoginPage';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import { ThemeProvider } from '@/lib/ThemeContext';
 import { Toaster } from '@/components/ui/sonner';
+import RequirePermission from '@/components/auth/RequirePermission';
 
 // Private Route Wrapper
 const PrivateRoute = ({ children }) => {
@@ -68,8 +69,8 @@ const App = () => {
               <Route path="backup" element={<Backup />} />
               <Route path="branches" element={<Branches />} />
               <Route path="branches/detail" element={<BranchDetail />} />
-              <Route path="users" element={<Users />} />
-              <Route path="users/detail" element={<UserDetail />} />
+              <Route path="users" element={<RequirePermission permission="manage_users" fallback={<Navigate to="/" replace />}><Users /></RequirePermission>} />
+              <Route path="users/detail" element={<RequirePermission permission="manage_users" fallback={<Navigate to="/" replace />}><UserDetail /></RequirePermission>} />
               <Route path="settings" element={<Settings />} />
               <Route path="hardware" element={<Hardware />} />
               <Route path="calendar" element={<Calendar />} />

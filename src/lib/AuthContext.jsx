@@ -4,6 +4,26 @@ import { isSessionValid, signSession } from '@/lib/security';
 
 const AuthContext = createContext();
 
+export const ROLE_PERMISSIONS = {
+  admin: [
+    'manage_users',
+    'delete_contract',
+    'export_data',
+    'import_data',
+    'reset_system'
+  ],
+  user: []
+};
+
+const withPermissions = (currentUser) => {
+  if (!currentUser) return null;
+  const permissions = ROLE_PERMISSIONS[currentUser.role] || [];
+  return {
+    ...currentUser,
+    permissions
+  };
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -52,7 +72,7 @@ export const AuthProvider = ({ children }) => {
       setIsLoadingAuth(true);
       const currentUser = await base44.auth.me();
       console.log('[AuthContext] User found:', currentUser);
-      setUser(currentUser);
+      setUser(withPermissions(currentUser));
       setIsAuthenticated(true);
     } catch (error) {
       console.log('[AuthContext] Not logged in (caught error):', error);
@@ -62,6 +82,18 @@ export const AuthProvider = ({ children }) => {
       console.log('[AuthContext] checkUserAuth FINALLY -> setIsLoadingAuth(false)');
       setIsLoadingAuth(false);
     }
+  };
+
+  const refreshUser = async () => {
+    await checkUserAuth();
+  };
+
+  const hasPermission = (permission) => {
+    return Boolean(user?.permissions?.includes(permission));
+  };
+
+  const hasAnyPermission = (permissions = []) => {
+    return permissions.some((permission) => hasPermission(permission));
   };
 
   const login = async (email, password) => {
@@ -123,7 +155,10 @@ export const AuthProvider = ({ children }) => {
       isLoadingAuth,
       login,
       logout,
-      verify2FA
+      verify2FA,
+      refreshUser,
+      hasPermission,
+      hasAnyPermission
     }}>
       {children}
     </AuthContext.Provider>
