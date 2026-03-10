@@ -33,6 +33,8 @@ import { FloatingActionButton } from "@/components/ui/floating-action-button";
 import { useIsMobile } from "@/lib/hooks/useMediaQuery";
 import { validateCustomerData } from "@/lib/validators";
 import { motion } from "framer-motion";
+import { executeSensitiveAction } from "@/lib/sensitiveActions";
+import { useAuth } from "@/lib/AuthContext";
 
 const pageVariants = {
   hidden: { opacity: 0, y: 10 },
@@ -42,6 +44,7 @@ const pageVariants = {
 export default function CustomerDetail({ isSplitView = false }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const isMobile = useIsMobile();
   const urlParams = new URLSearchParams(window.location.search);
   const customerId = urlParams.get('id');
@@ -585,9 +588,13 @@ export default function CustomerDetail({ isSplitView = false }) {
           <div className={cn("flex items-center gap-2 md:gap-3 flex-wrap", isSplitView ? "justify-end max-w-full ml-auto" : "md:justify-end")}>
             <Button
               onClick={() => {
-                if (confirm('Kunde wirklich löschen? Alle zugehörigen Verträge bleiben erhalten.')) {
-                  deleteMutation.mutate();
-                }
+                executeSensitiveAction({
+                  action: 'customer_delete',
+                  actor: user,
+                  context: { customerId },
+                  confirmationText: 'Kunde wirklich löschen? Alle zugehörigen Verträge bleiben erhalten.',
+                  onExecute: async () => deleteMutation.mutateAsync()
+                }).catch(() => toast.error('Kunde konnte nicht gelöscht werden.'));
               }}
               variant="outline"
               className={cn("rounded-xl border-rose-500/30 text-rose-400 hover:bg-rose-500/10 font-semibold", isSplitView ? "h-10 px-3 text-xs" : "h-12 px-6")}
@@ -1111,9 +1118,13 @@ export default function CustomerDetail({ isSplitView = false }) {
                       icon: Trash2,
                       label: 'Kunde löschen',
                       onClick: () => {
-                        if (confirm('Kunde wirklich löschen? Alle zugehörigen Verträge bleiben erhalten.')) {
-                          deleteMutation.mutate();
-                        }
+                        executeSensitiveAction({
+                          action: 'customer_delete',
+                          actor: user,
+                          context: { customerId },
+                          confirmationText: 'Kunde wirklich löschen? Alle zugehörigen Verträge bleiben erhalten.',
+                          onExecute: async () => deleteMutation.mutateAsync()
+                        }).catch(() => toast.error('Kunde konnte nicht gelöscht werden.'));
                       }
                     }
                   ]}
@@ -1382,9 +1393,13 @@ export default function CustomerDetail({ isSplitView = false }) {
                             variant="ghost"
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (confirm('Vertrag wirklich löschen?')) {
-                                deleteContractMutation.mutate(contract.id);
-                              }
+                              executeSensitiveAction({
+                                action: 'contract_delete',
+                                actor: user,
+                                context: { customerId, contractId: contract.id },
+                                confirmationText: 'Vertrag wirklich löschen?',
+                                onExecute: async () => deleteContractMutation.mutateAsync(contract.id)
+                              }).catch(() => toast.error('Vertrag konnte nicht gelöscht werden.'));
                             }}
                             className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
                           >

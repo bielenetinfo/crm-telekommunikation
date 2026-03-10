@@ -6,47 +6,76 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
+import { executeSensitiveAction } from "@/lib/sensitiveActions";
+import { useAuth } from "@/lib/AuthContext";
 
 export default function Backup() {
   const [isExporting, setIsExporting] = useState(false);
   const [lastBackup, setLastBackup] = useState(new Date().toISOString());
+  const { user } = useAuth();
 
-  const handleExport = () => {
+  const handleExport = async () => {
     setIsExporting(true);
+
     try {
-      const db = localStorage.getItem('bielenet_db');
-      const blob = new Blob([db], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `bielenet_backup_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      const confirmed = await executeSensitiveAction({
+        action: 'backup_export',
+        actor: user,
+        context: { page: 'backup' },
+        confirmationText: 'Backup-Export starten?',
+        onExecute: async () => {
+          const db = localStorage.getItem('bielenet_db');
+          const blob = new Blob([db], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `bielenet_backup_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.json`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }
+      });
+
+      if (!confirmed) {
+        toast.info('Export wurde abgebrochen.');
+        return;
+      }
+
       setLastBackup(new Date().toISOString());
       toast.success("Backup erfolgreich erstellt und heruntergeladen.");
     } catch (e) {
       toast.error("Backup-Fehler: " + e.message);
+    } finally {
+      setIsExporting(false);
     }
-    setIsExporting(false);
   };
 
-  const handleImport = (e) => {
+  const handleImport = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!confirm("⚠️ Achtung: Der Import überschreibt alle aktuellen Daten in diesem Browser. Fortfahren?")) {
-      e.target.value = '';
-      return;
-    }
-
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         const data = event.target?.result;
         JSON.parse(data); // Validate JSON
-        localStorage.setItem('bielenet_db', data);
+
+        const confirmed = await executeSensitiveAction({
+          action: 'backup_restore',
+          actor: user,
+          context: { file: file.name },
+          confirmationText: 'Backup-Import überschreibt alle lokalen Daten. Fortfahren?',
+          onExecute: async () => {
+            localStorage.setItem('bielenet_db', data);
+          }
+        });
+
+        if (!confirmed) {
+          toast.info('Import wurde abgebrochen.');
+          return;
+        }
+
         toast.success("Daten erfolgreich importiert. System wird neu geladen...");
         setTimeout(() => window.location.reload(), 1500);
       } catch (err) {
@@ -170,10 +199,21 @@ export default function Backup() {
             <Button
               variant="ghost"
               className="w-full border border-rose-500/30 text-rose-500 hover:bg-rose-500/10 hover:text-rose-600 font-bold"
-              onClick={() => {
-                if (confirm("⚠️ System komplett zurücksetzen? Alle Änderungen gehen verloren.")) {
-                  localStorage.clear();
+              onClick={async () => {
+                const confirmed = await executeSensitiveAction({
+                  action: 'system_hard_reset',
+                  actor: user,
+                  context: { page: 'backup' },
+                  confirmationText: 'System komplett zurücksetzen? Alle Änderungen gehen verloren.',
+                  onExecute: async () => {
+                    localStorage.clear();
+                  }
+                });
+
+                if (confirmed) {
                   window.location.reload();
+                } else {
+                  toast.info('Hard Reset abgebrochen.');
                 }
               }}
             >
