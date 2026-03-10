@@ -15,7 +15,8 @@ export async function logCustomerEvent({
   contractId = null,
   priority = "medium",
   tags = [],
-  dueAt = null
+  dueAt = null,
+  actorName = "System"
 }) {
   try {
     await base44.entities.CustomerHistory.create({
@@ -31,14 +32,16 @@ export async function logCustomerEvent({
       contract_id: contractId,
       priority,
       tags: JSON.stringify(tags),
-      is_system_event: true
+      is_system_event: true,
+      user_name: actorName,
+      changed_at: new Date().toISOString()
     });
   } catch (error) {
     console.error("Failed to log customer event:", error);
   }
 }
 
-export async function logContractCreated(customerId, customerName, contractId, providerName, category) {
+export async function logContractCreated(customerId, customerName, contractId, providerName, category, actorName = "System") {
   return logCustomerEvent({
     customerId,
     customerName,
@@ -46,11 +49,12 @@ export async function logContractCreated(customerId, customerName, contractId, p
     title: `Vertrag erstellt: ${providerName}`,
     notes: `Kategorie: ${category}`,
     contractId,
-    tags: ["contract", "created"]
+    tags: ["contract", "created"],
+    actorName
   });
 }
 
-export async function logContractUpdated(customerId, customerName, contractId, changes) {
+export async function logContractUpdated(customerId, customerName, contractId, changes, actorName = "System") {
   return logCustomerEvent({
     customerId,
     customerName,
@@ -58,29 +62,32 @@ export async function logContractUpdated(customerId, customerName, contractId, c
     title: "Vertrag aktualisiert",
     notes: changes,
     contractId,
-    tags: ["contract", "updated"]
+    tags: ["contract", "updated"],
+    actorName
   });
 }
 
-export async function logVvlStarted(customerId, customerName, contractId, providerName) {
+export async function logVvlStarted(customerId, customerName, contractId, providerName, actorName = "System") {
   return logCustomerEvent({
     customerId,
     customerName,
     type: "system",
     title: `VVL gestartet: ${providerName}`,
     contractId,
-    tags: ["vvl", "started"]
+    tags: ["vvl", "started"],
+    actorName
   });
 }
 
-export async function logVvlCompleted(customerId, customerName, contractId, outcome) {
+export async function logVvlCompleted(customerId, customerName, contractId, outcome, actorName = "System") {
   return logCustomerEvent({
     customerId,
     customerName,
     type: "system",
     title: `VVL abgeschlossen: ${outcome}`,
     contractId,
-    tags: ["vvl", "completed", outcome]
+    tags: ["vvl", "completed", outcome],
+    actorName
   });
 }
 
