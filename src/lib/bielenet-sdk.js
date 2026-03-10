@@ -17,6 +17,8 @@ import {
     isLoginLocked
 } from './security.js';
 import { validateCustomerData, validateContractData, validatePassword } from './validators.js';
+import { logAuditEvent } from './auditLogger.js';
+import { recordApiMetric } from './metrics.js';
 
 // Simulated Database in LocalStorage
 const DB_KEY = 'bielenet_db';
@@ -351,9 +353,22 @@ const calculateVvlPriority = (cancellationDeadline) => {
     return 'FUTURE';
 };
 
+
+const withMetrics = async (operation) => {
+    const start = performance.now();
+    try {
+        const result = await operation();
+        recordApiMetric({ durationMs: Math.round(performance.now() - start), ok: true });
+        return result;
+    } catch (error) {
+        recordApiMetric({ durationMs: Math.round(performance.now() - start), ok: false });
+        throw error;
+    }
+};
+
 // --- ENTITIES MODULE ---
 const createEntityHandler = (collection) => ({
-    list: async (options = {}) => {
+    list: async (options = {}) => withMetrics(async () => {
         const items = getDb()[collection] || [];
         if (!options.search) return items;
 
@@ -370,30 +385,59 @@ const createEntityHandler = (collection) => ({
                 (item.phone && item.phone.includes(term))
             );
         });
-    },
-    get: async (id) => getDb()[collection]?.find(i => i.id === id),
-    create: async (data) => {
+    }),
+    get: async (id) => withMetrics(async () => getDb()[collection]?.find(i => i.id === id)),
+    create: async (data) => withMetrics(async () => {
         const db = getDb();
         if (!db[collection]) db[collection] = [];
         const newItem = { id: crypto.randomUUID(), ...data, created_at: new Date().toISOString() };
         db[collection].push(newItem);
         saveDb(db);
         return newItem;
-    },
-    update: async (id, data) => {
+    }),
+    update: async (id, data) => withMetrics(async () => {
         const db = getDb();
         const idx = db[collection]?.findIndex(i => i.id === id);
         if (idx === -1) throw new Error('Not found');
 
+        const previous = db[collection][idx];
         db[collection][idx] = { ...db[collection][idx], ...data };
         saveDb(db);
+
+        if (collection === 'users' && (Object.hasOwn(data, 'role') || Object.hasOwn(data, 'permissions'))) {
+            logAuditEvent({
+                action: 'USER_RIGHTS_CHANGED',
+                entityType: 'User',
+                entityId: id,
+                details: {
+                    before: { role: previous.role, permissions: previous.permissions || null },
+                    after: { role: db[collection][idx].role, permissions: db[collection][idx].permissions || null }
+                },
+                severity: 'high'
+            });
+        }
+
         return db[collection][idx];
-    },
-    delete: async (id) => {
+    }),
+    delete: async (id) => withMetrics(async () => {
         const db = getDb();
+        const existing = db[collection]?.find(i => i.id === id);
         db[collection] = db[collection].filter(i => i.id !== id);
         saveDb(db);
-    }
+
+        if (collection === 'customers') {
+            logAuditEvent({
+                action: 'CUSTOMER_DELETED',
+                entityType: 'Customer',
+                entityId: id,
+                details: {
+                    customerName: existing ? `${existing.first_name || ''} ${existing.last_name || ''}`.trim() : null,
+                    deletedRecord: existing || null
+                },
+                severity: 'critical'
+            });
+        }
+    })
 });
 
 const ensureCoreCollections = (db) => {
@@ -1140,7 +1184,7 @@ seed();
 
 // Specialized Contract Handler with auto-calculation
 const createContractHandler = () => ({
-    list: async (options = {}) => {
+    list: async (options = {}) => withMetrics(async () => {
         let contracts = getDb().contracts || [];
 
         const sort = typeof options === 'string' ? options : options.sort;
@@ -1161,9 +1205,9 @@ const createContractHandler = () => ({
             return contracts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
         }
         return contracts;
-    },
-    get: async (id) => getDb().contracts?.find(i => i.id === id),
-    create: async (data) => {
+    }),
+    get: async (id) => withMetrics(async () => getDb().contracts?.find(i => i.id === id)),
+    create: async (data) => withMetrics(async () => {
         const db = getDb();
         if (!db.contracts) db.contracts = [];
 
@@ -1183,8 +1227,8 @@ const createContractHandler = () => ({
         db.contracts.push(newContract);
         saveDb(db);
         return newContract;
-    },
-    update: async (id, data) => {
+    }),
+    update: async (id, data) => withMetrics(async () => {
         const db = getDb();
         const idx = db.contracts?.findIndex(i => i.id === id);
         if (idx === -1) throw new Error('Not found');
@@ -1197,15 +1241,25 @@ const createContractHandler = () => ({
             updatedData.vvl_priority = calculateVvlPriority(updatedData.cancellation_deadline);
         }
 
+        const previous = db.contracts[idx];
         db.contracts[idx] = updatedData;
         saveDb(db);
+
+        logAuditEvent({
+            action: 'CONTRACT_CHANGED',
+            entityType: 'Contract',
+            entityId: id,
+            details: { before: previous, after: updatedData, changedFields: Object.keys(data || {}) },
+            severity: 'high'
+        });
+
         return db.contracts[idx];
-    },
-    delete: async (id) => {
+    }),
+    delete: async (id) => withMetrics(async () => {
         const db = getDb();
         db.contracts = db.contracts.filter(i => i.id !== id);
         saveDb(db);
-    }
+    })
 });
 
 export const bielenet = {

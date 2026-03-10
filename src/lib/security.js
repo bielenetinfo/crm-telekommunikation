@@ -4,6 +4,7 @@
  */
 
 import CryptoJS from 'crypto-js';
+import { recordFailedLoginMetric } from './metrics.js';
 
 const HMAC_SECRET = 'BIELENET_SESSION_HMAC_2026';
 
@@ -186,6 +187,7 @@ export const recordFailedLogin = (email) => {
         }
 
         localStorage.setItem(LOGIN_ATTEMPT_KEY, JSON.stringify(attempts));
+        recordFailedLoginMetric();
     } catch (error) {
         console.error('Error recording failed login:', error);
     }
