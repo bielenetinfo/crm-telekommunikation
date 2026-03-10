@@ -10,9 +10,12 @@ import { ArrowLeft, Save, Shield, User } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { validatePassword } from "@/lib/validators";
+import { useAuth } from '@/lib/AuthContext';
+import { canAccessAction, ACTION_PERMISSIONS, ROLES } from '@/lib/security';
 
 export default function UserDetail() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const urlParams = new URLSearchParams(window.location.search);
   const userId = urlParams.get('id');
@@ -21,11 +24,11 @@ export default function UserDetail() {
   const [formData, setFormData] = useState({
     full_name: "",
     email: "",
-    role: "user",
+    role: ROLES.AGENT,
     password: ""
   });
 
-  const { data: user } = useQuery({
+  const { data: userData } = useQuery({
     queryKey: ['user', userId],
     queryFn: async () => {
       const users = await base44.entities.User.list();
@@ -35,14 +38,14 @@ export default function UserDetail() {
   });
 
   useEffect(() => {
-    if (user) {
+    if (userData) {
       setFormData({
-        full_name: user.full_name || "",
-        email: user.email || "",
-        role: user.role || "user"
+        full_name: userData.full_name || "",
+        email: userData.email || "",
+        role: userData.role || ROLES.AGENT
       });
     }
-  }, [user]);
+  }, [userData]);
 
   const createMutation = useMutation({
     mutationFn: (data) => base44.auth.createUser(data.email, data.password, data.role, data.full_name),
@@ -61,6 +64,15 @@ export default function UserDetail() {
   });
 
   const handleSubmit = () => {
+    if (!canAccessAction(user, ACTION_PERMISSIONS.userManagement)) {
+      alert('Keine Berechtigung für Benutzerverwaltung');
+      return;
+    }
+
+    if ((isNew || formData.role !== (userData?.role || ROLES.AGENT)) && !canAccessAction(user, ACTION_PERMISSIONS.roleChange)) {
+      alert('Keine Berechtigung für Rollenänderungen');
+      return;
+    }
     if (isNew) {
       if (!validatePassword(formData.password || "")) {
         alert("Passwort: min. 8 Zeichen, 1 Zahl, 1 Sonderzeichen");
@@ -86,7 +98,7 @@ export default function UserDetail() {
         </Button>
         <div className="flex-1">
           <h1 className="app-page-title">
-            {isNew ? "Neuer Benutzer" : user?.full_name}
+            {isNew ? "Neuer Benutzer" : userData?.full_name}
           </h1>
           <p className="text-sm text-muted-foreground font-medium mt-0.5">
             {isNew ? "Benutzer einladen" : "Benutzerdetails"}
@@ -95,7 +107,7 @@ export default function UserDetail() {
         {!isNew && (
           <Button
             onClick={handleSubmit}
-            disabled={updateMutation.isPending}
+            disabled={updateMutation.isPending || !canAccessAction(user, ACTION_PERMISSIONS.userManagement)}
             className="btn-premium bg-primary text-primary-foreground font-bold h-12 px-8 rounded-xl shadow-lg shadow-primary/20 text-sm"
           >
             <Save className="h-4 w-4 mr-2" />
@@ -148,13 +160,25 @@ export default function UserDetail() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-[#1F2228] border-[#2D3139]">
-                <SelectItem value="user" className="text-[#EAECEF]">
+                <SelectItem value={ROLES.VIEWER} className="text-[#EAECEF]">
                   <div className="flex items-center gap-2">
                     <User className="h-4 w-4" />
-                    Benutzer
+                    Viewer
                   </div>
                 </SelectItem>
-                <SelectItem value="admin" className="text-[#EAECEF]">
+                <SelectItem value={ROLES.AGENT} className="text-[#EAECEF]">
+                  <div className="flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    Agent
+                  </div>
+                </SelectItem>
+                <SelectItem value={ROLES.MANAGER} className="text-[#EAECEF]">
+                  <div className="flex items-center gap-2">
+                    <Shield className="h-4 w-4" />
+                    Manager
+                  </div>
+                </SelectItem>
+                <SelectItem value={ROLES.ADMIN} className="text-[#EAECEF]">
                   <div className="flex items-center gap-2">
                     <Shield className="h-4 w-4" />
                     Administrator

@@ -3,6 +3,8 @@ import { LayoutDashboard, Users, AlertCircle, FileText, MoreHorizontal } from 'l
 import { TabBarItem } from './TabBarItem';
 import { cn } from '@/lib/utils';
 import { createPageUrl } from '@/utils';
+import { filterNavigationItems } from '@/lib/security';
+import { useAuth } from '@/lib/AuthContext';
 
 /**
  * Bottom Tab Bar Navigation for Mobile
@@ -11,14 +13,16 @@ import { createPageUrl } from '@/utils';
 export default function BottomTabBar() {
     const navigate = useNavigate();
     const location = useLocation();
+    const { user } = useAuth();
 
     // Tab configuration
-    const tabs = [
+    const tabs = filterNavigationItems([
         {
             id: 'dashboard',
             label: 'Start',
             icon: LayoutDashboard,
             route: createPageUrl('Dashboard'),
+            path: createPageUrl('Dashboard'),
             badge: 0
         },
         {
@@ -26,6 +30,7 @@ export default function BottomTabBar() {
             label: 'Kunden',
             icon: Users,
             route: createPageUrl('Customers'),
+            path: createPageUrl('Customers'),
             badge: 0
         },
         {
@@ -33,6 +38,7 @@ export default function BottomTabBar() {
             label: 'VVL',
             icon: AlertCircle,
             route: createPageUrl('VVL'),
+            path: createPageUrl('VVL'),
             badge: 0 // Could be dynamically set based on VVL count
         },
         {
@@ -40,6 +46,7 @@ export default function BottomTabBar() {
             label: 'Verträge',
             icon: FileText,
             route: createPageUrl('Contracts'),
+            path: createPageUrl('Contracts'),
             badge: 0
         },
         {
@@ -47,9 +54,10 @@ export default function BottomTabBar() {
             label: 'Mehr',
             icon: MoreHorizontal,
             route: createPageUrl('Settings'),
+            path: createPageUrl('Settings'),
             badge: 0
         },
-    ];
+    ], user);
 
     // Determine active tab based on current route
     const getActiveTab = () => {

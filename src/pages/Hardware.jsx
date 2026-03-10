@@ -10,6 +10,8 @@ import { cn } from "@/lib/utils";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
+import { canAccessAction, ACTION_PERMISSIONS } from '@/lib/security';
+import { useAuth } from '@/lib/AuthContext';
 
 const containerVariants = {
     hidden: { opacity: 0 },
@@ -36,6 +38,7 @@ import {
 
 export default function Hardware() {
     const queryClient = useQueryClient();
+    const { user } = useAuth();
     const [search, setSearch] = useState("");
     const [deleteId, setDeleteId] = useState(null);
 
@@ -108,6 +111,7 @@ export default function Hardware() {
                 </div>
                 <Button
                     onClick={handleCreateHardware}
+                    disabled={!canAccessAction(user, ACTION_PERMISSIONS.delete)}
                     className="btn-premium bg-primary text-primary-foreground hover:bg-primary/90 font-bold px-6 h-12 shadow-lg shadow-primary/20 text-sm rounded-xl"
                 >
                     <Plus className="h-4 w-4 mr-2" /> Neues Gerät
@@ -206,7 +210,7 @@ export default function Hardware() {
                                             variant="outline"
                                             size="sm"
                                             className="h-9 text-xs text-rose-500 hover:bg-rose-500/10 hover:text-rose-500"
-                                            onClick={() => setDeleteId(item.id)}
+                                            onClick={() => canAccessAction(user, ACTION_PERMISSIONS.delete) && setDeleteId(item.id)}
                                         >
                                             <Trash2 className="h-3 w-3" />
                                         </Button>

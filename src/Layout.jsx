@@ -27,6 +27,7 @@ import CommandPalette from "@/components/search/CommandPalette";
 import QuickCreateCustomerModal from "@/components/search/QuickCreateCustomerModal";
 import HeaderClock from "@/components/HeaderClock";
 import { useAuth } from '@/lib/AuthContext';
+import { canAccessAction, filterNavigationItems, ACTION_PERMISSIONS } from '@/lib/security';
 import { useTheme } from '@/lib/ThemeContext';
 import { useIsMobile } from '@/lib/hooks/useMediaQuery';
 import BottomTabBar from '@/components/navigation/BottomTabBar';
@@ -123,7 +124,7 @@ const NavItem = ({ item, location, isCollapsed }) => {
   return LinkContent;
 };
 
-const SidebarContent = ({ location, logout, isCollapsed, toggleCollapse, isMobile }) => (
+const SidebarContent = ({ location, logout, isCollapsed, toggleCollapse, isMobile, user }) => (
   <div className={cn("flex flex-col h-full bg-[#0A0A0B] border-r border-white/5", isCollapsed ? "w-[80px]" : "w-full")}>
     {/* Logo */}
     <div className={cn("p-5 lg:p-6 pb-2", isCollapsed && "p-4 pb-2")}>
@@ -149,7 +150,7 @@ const SidebarContent = ({ location, logout, isCollapsed, toggleCollapse, isMobil
             {!isCollapsed && <h4 className="px-4 text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em] mb-2 fade-in">Hauptmenü</h4>}
             {isCollapsed && <div className="h-4" />} {/* Spacer for alignment */}
             <nav className="space-y-1">
-              {navigation.core.map((item) => (
+              {filterNavigationItems(navigation.core, user).map((item) => (
                 <NavItem key={item.name} item={item} location={location} isCollapsed={isCollapsed} />
               ))}
             </nav>
@@ -159,7 +160,7 @@ const SidebarContent = ({ location, logout, isCollapsed, toggleCollapse, isMobil
           <div className="space-y-1">
             {!isCollapsed && <h4 className="px-4 text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em] mb-2 fade-in">Verwaltung</h4>}
             <nav className="space-y-1">
-              {navigation.admin.map((item) => (
+              {filterNavigationItems(navigation.admin, user).map((item) => (
                 <NavItem key={item.name} item={item} location={location} isCollapsed={isCollapsed} />
               ))}
             </nav>
@@ -246,7 +247,7 @@ export default function Layout() {
   });
   const location = useLocation();
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const isMobile = useIsMobile();
 
@@ -290,7 +291,7 @@ export default function Layout() {
 
         {/* Desktop Sidebar */}
         <aside className={cn("hidden lg:flex flex-col fixed inset-y-0 z-50 transition-[width] duration-300 motion-reduce:transition-none", isCollapsed ? "w-[80px]" : "w-[280px]")}>
-          <SidebarContent location={location} logout={logout} isCollapsed={isCollapsed} toggleCollapse={() => setIsCollapsed(!isCollapsed)} isMobile={false} />
+          <SidebarContent location={location} logout={logout} isCollapsed={isCollapsed} toggleCollapse={() => setIsCollapsed(!isCollapsed)} isMobile={false} user={user} />
         </aside>
 
         {/* Main Content Wrapper */}
@@ -307,7 +308,7 @@ export default function Layout() {
                     </Button>
                   </SheetTrigger>
                   <SheetContent side="left" className="p-0 w-[min(92vw,360px)] border-r border-white/10 bg-[#0A0A0B]">
-                    <SidebarContent location={location} logout={logout} isCollapsed={false} isMobile={true} />
+                    <SidebarContent location={location} logout={logout} isCollapsed={false} isMobile={true} user={user} />
                   </SheetContent>
                 </Sheet>
 
@@ -398,6 +399,12 @@ export default function Layout() {
                           <CheckSquare className="mr-2 h-4 w-4 text-rose-400" />
                           <span>Neue Aufgabe</span>
                         </DropdownMenuItem>
+                        {canAccessAction(user, ACTION_PERMISSIONS.userManagement) && (
+                          <DropdownMenuItem onClick={() => navigate('/users/detail?new=true')} className="cursor-pointer hover:bg-white/5 focus:bg-white/5 py-3">
+                            <UserCog className="mr-2 h-4 w-4 text-blue-400" />
+                            <span>Neuer Benutzer</span>
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>

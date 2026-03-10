@@ -6,6 +6,165 @@
 import CryptoJS from 'crypto-js';
 
 const HMAC_SECRET = 'BIELENET_SESSION_HMAC_2026';
+const AUDIT_LOG_KEY = 'bielenet_audit_log';
+
+export const ROLES = Object.freeze({
+    ADMIN: 'admin',
+    MANAGER: 'manager',
+    AGENT: 'agent',
+    VIEWER: 'viewer'
+});
+
+export const PERMISSIONS = Object.freeze({
+    VIEW_DASHBOARD: 'view_dashboard',
+    VIEW_CUSTOMERS: 'view_customers',
+    VIEW_CONTRACTS: 'view_contracts',
+    VIEW_VVL: 'view_vvl',
+    VIEW_TASKS: 'view_tasks',
+    VIEW_CALENDAR: 'view_calendar',
+    VIEW_REMINDERS: 'view_reminders',
+    MANAGE_PROVIDERS: 'manage_providers',
+    MANAGE_HARDWARE: 'manage_hardware',
+    MANAGE_BRANCHES: 'manage_branches',
+    MANAGE_USERS: 'manage_users',
+    ACCESS_BACKUP: 'access_backup',
+    MANAGE_SETTINGS: 'manage_settings',
+    DELETE_RECORDS: 'delete_records',
+    EXPORT_DATA: 'export_data',
+    MANAGE_USER_ROLES: 'manage_user_roles',
+    UPDATE_CONTRACT_STATUS: 'update_contract_status'
+});
+
+const ROUTE_PERMISSION_MAP = Object.freeze({
+    '/': PERMISSIONS.VIEW_DASHBOARD,
+    '/customers': PERMISSIONS.VIEW_CUSTOMERS,
+    '/contracts': PERMISSIONS.VIEW_CONTRACTS,
+    '/vvl': PERMISSIONS.VIEW_VVL,
+    '/tasks': PERMISSIONS.VIEW_TASKS,
+    '/calendar': PERMISSIONS.VIEW_CALENDAR,
+    '/reminders': PERMISSIONS.VIEW_REMINDERS,
+    '/providers': PERMISSIONS.MANAGE_PROVIDERS,
+    '/hardware': PERMISSIONS.MANAGE_HARDWARE,
+    '/branches': PERMISSIONS.MANAGE_BRANCHES,
+    '/users': PERMISSIONS.MANAGE_USERS,
+    '/backup': PERMISSIONS.ACCESS_BACKUP,
+    '/settings': PERMISSIONS.MANAGE_SETTINGS
+});
+
+export const ACTION_PERMISSIONS = Object.freeze({
+    delete: PERMISSIONS.DELETE_RECORDS,
+    export: PERMISSIONS.EXPORT_DATA,
+    userManagement: PERMISSIONS.MANAGE_USERS,
+    roleChange: PERMISSIONS.MANAGE_USER_ROLES,
+    contractStatusChange: PERMISSIONS.UPDATE_CONTRACT_STATUS
+});
+
+const ROLE_PERMISSIONS = Object.freeze({
+    [ROLES.ADMIN]: Object.values(PERMISSIONS),
+    [ROLES.MANAGER]: [
+        PERMISSIONS.VIEW_DASHBOARD,
+        PERMISSIONS.VIEW_CUSTOMERS,
+        PERMISSIONS.VIEW_CONTRACTS,
+        PERMISSIONS.VIEW_VVL,
+        PERMISSIONS.VIEW_TASKS,
+        PERMISSIONS.VIEW_CALENDAR,
+        PERMISSIONS.VIEW_REMINDERS,
+        PERMISSIONS.MANAGE_PROVIDERS,
+        PERMISSIONS.MANAGE_HARDWARE,
+        PERMISSIONS.MANAGE_BRANCHES,
+        PERMISSIONS.ACCESS_BACKUP,
+        PERMISSIONS.MANAGE_SETTINGS,
+        PERMISSIONS.DELETE_RECORDS,
+        PERMISSIONS.EXPORT_DATA,
+        PERMISSIONS.UPDATE_CONTRACT_STATUS
+    ],
+    [ROLES.AGENT]: [
+        PERMISSIONS.VIEW_DASHBOARD,
+        PERMISSIONS.VIEW_CUSTOMERS,
+        PERMISSIONS.VIEW_CONTRACTS,
+        PERMISSIONS.VIEW_VVL,
+        PERMISSIONS.VIEW_TASKS,
+        PERMISSIONS.VIEW_CALENDAR,
+        PERMISSIONS.VIEW_REMINDERS,
+        PERMISSIONS.MANAGE_SETTINGS,
+        PERMISSIONS.UPDATE_CONTRACT_STATUS
+    ],
+    [ROLES.VIEWER]: [
+        PERMISSIONS.VIEW_DASHBOARD,
+        PERMISSIONS.VIEW_CUSTOMERS,
+        PERMISSIONS.VIEW_CONTRACTS,
+        PERMISSIONS.VIEW_CALENDAR,
+        PERMISSIONS.VIEW_REMINDERS,
+        PERMISSIONS.MANAGE_SETTINGS
+    ]
+});
+
+export const normalizeRole = (role) => {
+    if (!role) return ROLES.VIEWER;
+    if (role === 'user') return ROLES.AGENT;
+    return ROLE_PERMISSIONS[role] ? role : ROLES.VIEWER;
+};
+
+export const getRolePermissions = (role) => {
+    return ROLE_PERMISSIONS[normalizeRole(role)] || [];
+};
+
+export const hasPermission = (userOrRole, permission) => {
+    if (!permission) return true;
+    const role = typeof userOrRole === 'string' ? userOrRole : userOrRole?.role;
+    return getRolePermissions(role).includes(permission);
+};
+
+export const canAccessAction = (userOrRole, actionOrPermission) => {
+    if (!actionOrPermission) return true;
+    const permission = ACTION_PERMISSIONS[actionOrPermission] || actionOrPermission;
+    return hasPermission(userOrRole, permission);
+};
+
+export const getRoutePermission = (pathname = '/') => {
+    const matchedPath = Object.keys(ROUTE_PERMISSION_MAP)
+        .filter(route => pathname === route || (route !== '/' && pathname.startsWith(route)))
+        .sort((a, b) => b.length - a.length)[0];
+    return matchedPath ? ROUTE_PERMISSION_MAP[matchedPath] : PERMISSIONS.VIEW_DASHBOARD;
+};
+
+export const canAccessRoute = (userOrRole, pathname = '/') => {
+    return hasPermission(userOrRole, getRoutePermission(pathname));
+};
+
+export const filterNavigationItems = (items = [], userOrRole) => {
+    return items.filter((item) => canAccessRoute(userOrRole, item.path));
+};
+
+export const assertPermission = (userOrRole, actionOrPermission, message = 'Nicht autorisiert') => {
+    if (!canAccessAction(userOrRole, actionOrPermission)) {
+        const error = new Error(message);
+        error.status = 403;
+        throw error;
+    }
+};
+
+export const appendAuditLog = (event) => {
+    try {
+        const logs = JSON.parse(localStorage.getItem(AUDIT_LOG_KEY) || '[]');
+        logs.push({
+            id: crypto.randomUUID(),
+            timestamp: new Date().toISOString(),
+            ...event
+        });
+        localStorage.setItem(AUDIT_LOG_KEY, JSON.stringify(logs));
+    } catch (error) {
+        console.error('Audit logging failed:', error);
+    }
+};
+
+export const getAuditLogs = () => {
+    try {
+        return JSON.parse(localStorage.getItem(AUDIT_LOG_KEY) || '[]');
+    } catch {
+        return [];
+    }
+};
 
 export const signSession = (sessionObj) => {
     try {

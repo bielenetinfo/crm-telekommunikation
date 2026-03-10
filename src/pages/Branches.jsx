@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Building2, MapPin, User, Plus, Pencil, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from '@/lib/AuthContext';
 import { createPageUrl } from "@/utils";
 import { useToast } from "@/components/ui/use-toast";
 import {
@@ -19,6 +20,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { motion } from "framer-motion";
+import { canAccessAction, ACTION_PERMISSIONS } from '@/lib/security';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -35,6 +37,7 @@ const itemVariants = {
 
 export default function Branches() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -73,6 +76,7 @@ export default function Branches() {
         </div>
         <Button
           onClick={() => navigate(`${createPageUrl('BranchDetail')}?new=true`)}
+          disabled={!canAccessAction(user, ACTION_PERMISSIONS.delete)}
           className="btn-premium bg-primary text-primary-foreground hover:bg-primary/90 font-bold px-6 h-12 shadow-lg shadow-primary/20 text-sm rounded-xl"
         >
           <Plus className="h-4 w-4 mr-2" /> Neue Filiale
@@ -106,6 +110,7 @@ export default function Branches() {
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8 rounded-lg bg-secondary/50 hover:bg-rose-500/20 hover:text-rose-500"
+                      disabled={!canAccessAction(user, ACTION_PERMISSIONS.delete)}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -120,7 +125,7 @@ export default function Branches() {
                     <AlertDialogFooter>
                       <AlertDialogCancel className="bg-secondary">Abbrechen</AlertDialogCancel>
                       <AlertDialogAction
-                        onClick={() => deleteMutation.mutate(b.id)}
+                        onClick={() => canAccessAction(user, ACTION_PERMISSIONS.delete) && deleteMutation.mutate(b.id)}
                         className="bg-rose-600 hover:bg-rose-700"
                       >
                         Löschen
