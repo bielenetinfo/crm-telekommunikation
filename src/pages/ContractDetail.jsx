@@ -27,7 +27,8 @@ import { downloadBlob, createBlobURL, revokeBlobURL } from "@/components/pdf/dow
 import { toast } from "sonner";
 import { FloatingActionButton } from "@/components/ui/floating-action-button";
 import { useIsMobile } from "@/lib/hooks/useMediaQuery";
-import { validateContractData } from "@/lib/validators";
+import { getContractStatusTransitionIssues, validateContractData } from "@/lib/validators";
+import { CONTRACT_STATUS, CONTRACT_STATUS_OPTIONS } from "@/lib/statusEnums";
 import { motion } from "framer-motion";
 
 const pageVariants = {
@@ -56,7 +57,7 @@ export default function ContractDetail() {
     notice_period_days: DEFAULT_NOTICE_PERIOD_DAYS,
     monthly_fee: "",
     commission: "",
-    status: "aktiv",
+    status: CONTRACT_STATUS.ACTIVE,
     vvl_status: "offen",
     notes: "",
     tariff_name: "",
@@ -87,6 +88,7 @@ export default function ContractDetail() {
     cancellation_deadline: null
   });
   const [errors, setErrors] = useState({});
+  const [initialStatus, setInitialStatus] = useState(CONTRACT_STATUS.ACTIVE);
 
   const { data: contract } = useQuery({
     queryKey: ['contract', contractId],
@@ -197,6 +199,7 @@ export default function ContractDetail() {
         console.error("Error parsing dates:", e);
       }
 
+      setInitialStatus(contract.status || CONTRACT_STATUS.ACTIVE);
       setFormData({
         customer_id: contract.customer_id || "",
         provider_id: contract.provider_id || "",
@@ -206,7 +209,7 @@ export default function ContractDetail() {
         notice_period_days: contract.notice_period_days || DEFAULT_NOTICE_PERIOD_DAYS,
         monthly_fee: contract.monthly_fee || "",
         commission: contract.commission || "",
-        status: contract.status || "aktiv",
+        status: contract.status || CONTRACT_STATUS.ACTIVE,
         vvl_status: contract.vvl_status || "offen",
         notes: contract.notes || "",
         tariff_name: contract.tariff_name || "",
@@ -449,6 +452,17 @@ export default function ContractDetail() {
     if (!formData.contract_duration_months) newErrors.contract_duration_months = "Laufzeit wählen";
     if (!formData.category) newErrors.category = "Kategorie auswählen";
 
+    const selectedCustomer = customers.find(c => c.id === formData.customer_id);
+    const transitionIssues = getContractStatusTransitionIssues(initialStatus, formData.status, {
+      dsgvo_document_url: selectedCustomer?.dsgvo_document_url,
+      tariff_name: formData.tariff_name,
+      contract_duration_months: formData.contract_duration_months
+    });
+
+    if (transitionIssues.length > 0) {
+      newErrors.status = transitionIssues.join(', ');
+    }
+
     try {
       validateContractData({
         contract_number: formData.contract_number,
@@ -523,6 +537,12 @@ export default function ContractDetail() {
 
   const priority = contract && !isNew ? getContractPriority(contract, followups, new Date()) : null;
   const colors = priority ? getPriorityColor(priority.level) : null;
+  const selectedCustomer = customers.find(c => c.id === formData.customer_id);
+  const contractChecklist = [
+    { key: "dsgvo", label: "DSGVO vorhanden", complete: !!selectedCustomer?.dsgvo_document_url },
+    { key: "tariff", label: "Produkt/Tarif gesetzt", complete: !!formData.tariff_name?.trim() },
+    { key: "duration", label: "Laufzeit gesetzt", complete: !!formData.contract_duration_months }
+  ];
 
   const createHistoryMutation = useMutation({
     mutationFn: async (data) => {
@@ -612,7 +632,7 @@ export default function ContractDetail() {
         {/* Desktop: Action Buttons - Mobile: FAB */}
         {!isNew && contract && !isMobile && (
           <div className="order-3 lg:order-none basis-full lg:basis-auto flex items-center gap-2 md:gap-3 flex-wrap">
-            {contract.status === 'aktiv' && ['offen', 'geplant'].includes(contract.vvl_status) && (
+            {contract.status === CONTRACT_STATUS.ACTIVE && ['offen', 'geplant'].includes(contract.vvl_status) && (
               <Button
                 onClick={() => setShowVvlWizard(true)}
                 className="h-10 md:h-11 px-4 md:px-6 rounded-xl bg-emerald-500 text-white font-bold text-xs md:text-sm shadow-lg shadow-emerald-500/20 hover:bg-emerald-600"
@@ -813,6 +833,18 @@ export default function ContractDetail() {
         </Card>
       )}
 
+      <Card className="p-5 bg-card border border-border">
+        <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Aktivierungs-Checkliste</p>
+        <div className="space-y-1">
+          {contractChecklist.map(item => (
+            <div key={item.key} className="text-sm flex items-center justify-between">
+              <span>{item.label}</span>
+              <span className={cn(item.complete ? "text-emerald-400" : "text-rose-400")}>{item.complete ? "Erfüllt" : "Fehlt"}</span>
+            </div>
+          ))}
+        </div>
+      </Card>
+
       {/* Vertragsdaten */}
       <Card className="p-5 bg-card border border-border">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -872,17 +904,19 @@ export default function ContractDetail() {
 
           <div>
             <Label className="text-[#EAECEF]">Status</Label>
-            <Select value={formData.status} onValueChange={(v) => setFormData({ ...formData, status: v })}>
-              <SelectTrigger className="mt-2 bg-[#1F2228] border-[#2D3139] text-[#EAECEF]">
+            <Select value={formData.status} onValueChange={(v) => handleFieldChange("status", v)}>
+              <SelectTrigger className={cn("mt-2 bg-[#1F2228] border-[#2D3139] text-[#EAECEF]", errors.status && "border-red-500")}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-[#1F2228] border-[#2D3139]">
-                <SelectItem value="aktiv" className="text-[#EAECEF]">Aktiv</SelectItem>
-                <SelectItem value="gekündigt" className="text-[#EAECEF]">Gekündigt</SelectItem>
-                <SelectItem value="abgelaufen" className="text-[#EAECEF]">Abgelaufen</SelectItem>
-                <SelectItem value="verlängert" className="text-[#EAECEF]">Verlängert</SelectItem>
+                {CONTRACT_STATUS_OPTIONS.map(option => (
+                  <SelectItem key={option.value} value={option.value} className="text-[#EAECEF]">
+                    {option.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
+            {errors.status && <p className="text-xs text-red-500 mt-1">{errors.status}</p>}
           </div>
         </div>
       </Card>

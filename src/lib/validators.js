@@ -4,6 +4,7 @@
  */
 
 import DOMPurify from 'dompurify';
+import { CONTRACT_STATUS, CUSTOMER_LIFECYCLE_PHASES } from '@/lib/statusEnums';
 
 /**
  * Very simple password policy:
@@ -38,6 +39,117 @@ export const validateEmail = (email) => {
 export const sanitizePhone = (phone) => {
     if (!phone || typeof phone !== 'string') return '';
     return phone.replace(/[^\d+\s()-]/g, '').trim();
+};
+
+export const normalizePhone = (phone) => {
+    const sanitized = sanitizePhone(phone);
+    if (!sanitized) return '';
+
+    const compact = sanitized.replace(/[\s()-]/g, '');
+    if (compact.startsWith('+')) return compact;
+    if (compact.startsWith('00')) return `+${compact.slice(2)}`;
+    if (compact.startsWith('0')) return `+49${compact.slice(1)}`;
+    return `+49${compact}`;
+};
+
+export const normalizeName = (value) => {
+    if (!value || typeof value !== 'string') return '';
+    return value
+        .trim()
+        .replace(/\s+/g, ' ')
+        .split(' ')
+        .map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+        .join(' ');
+};
+
+export const normalizeCustomerContactData = (data = {}) => ({
+    ...data,
+    email: data.email ? data.email.trim().toLowerCase() : '',
+    phone: normalizePhone(data.phone),
+    first_name: data.first_name ? normalizeName(data.first_name) : '',
+    last_name: data.last_name ? normalizeName(data.last_name) : '',
+    company_name: data.company_name ? data.company_name.trim().replace(/\s+/g, ' ') : '',
+    city: data.city ? normalizeName(data.city) : '',
+    postal_code: data.postal_code ? data.postal_code.toString().trim() : ''
+});
+
+const isPresent = (value) => {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'number') return !Number.isNaN(value);
+    return !!value?.toString().trim();
+};
+
+export const REQUIRED_CUSTOMER_FIELDS_BY_PHASE = {
+    [CUSTOMER_LIFECYCLE_PHASES.LEAD]: [
+        { key: 'first_name', label: 'Vorname' },
+        { key: 'last_name', label: 'Nachname' },
+        { key: 'phone', label: 'Telefonnummer' }
+    ],
+    [CUSTOMER_LIFECYCLE_PHASES.QUALIFIED]: [
+        { key: 'first_name', label: 'Vorname' },
+        { key: 'last_name', label: 'Nachname' },
+        { key: 'phone', label: 'Telefonnummer' },
+        { key: 'email', label: 'E-Mail' },
+        { key: 'address', label: 'Adresse' },
+        { key: 'postal_code', label: 'PLZ' },
+        { key: 'city', label: 'Ort' }
+    ],
+    [CUSTOMER_LIFECYCLE_PHASES.OFFER]: [
+        { key: 'first_name', label: 'Vorname' },
+        { key: 'last_name', label: 'Nachname' },
+        { key: 'phone', label: 'Telefonnummer' },
+        { key: 'email', label: 'E-Mail' },
+        { key: 'address', label: 'Adresse' },
+        { key: 'postal_code', label: 'PLZ' },
+        { key: 'city', label: 'Ort' },
+        { key: 'branch_id', label: 'Filiale' }
+    ],
+    [CUSTOMER_LIFECYCLE_PHASES.ACTIVE]: [
+        { key: 'first_name', label: 'Vorname' },
+        { key: 'last_name', label: 'Nachname' },
+        { key: 'phone', label: 'Telefonnummer' },
+        { key: 'email', label: 'E-Mail' },
+        { key: 'address', label: 'Adresse' },
+        { key: 'postal_code', label: 'PLZ' },
+        { key: 'city', label: 'Ort' },
+        { key: 'branch_id', label: 'Filiale' },
+        { key: 'dsgvo_document_url', label: 'DSGVO-Dokument' }
+    ]
+};
+
+export const getCustomerLifecycleChecklist = (data = {}, phase = CUSTOMER_LIFECYCLE_PHASES.LEAD) => {
+    const required = REQUIRED_CUSTOMER_FIELDS_BY_PHASE[phase] || REQUIRED_CUSTOMER_FIELDS_BY_PHASE[CUSTOMER_LIFECYCLE_PHASES.LEAD];
+    return required.map((field) => ({
+        ...field,
+        complete: isPresent(data[field.key])
+    }));
+};
+
+const ALLOWED_CONTRACT_TRANSITIONS = {
+    [CONTRACT_STATUS.ACTIVE]: [CONTRACT_STATUS.CANCELLED, CONTRACT_STATUS.EXPIRED, CONTRACT_STATUS.RENEWED, CONTRACT_STATUS.REPLACED],
+    [CONTRACT_STATUS.CANCELLED]: [CONTRACT_STATUS.RENEWED],
+    [CONTRACT_STATUS.EXPIRED]: [CONTRACT_STATUS.RENEWED],
+    [CONTRACT_STATUS.RENEWED]: [CONTRACT_STATUS.ACTIVE],
+    [CONTRACT_STATUS.REPLACED]: []
+};
+
+export const getContractStatusTransitionIssues = (currentStatus, nextStatus, contractData = {}) => {
+    if (!nextStatus || currentStatus === nextStatus) return [];
+
+    const allowedTargets = ALLOWED_CONTRACT_TRANSITIONS[currentStatus] || [];
+    const issues = [];
+
+    if (!allowedTargets.includes(nextStatus)) {
+        issues.push(`Statuswechsel von "${currentStatus}" nach "${nextStatus}" ist nicht erlaubt`);
+    }
+
+    if (nextStatus === CONTRACT_STATUS.ACTIVE) {
+        if (!isPresent(contractData.dsgvo_document_url)) issues.push('DSGVO-Dokument fehlt');
+        if (!isPresent(contractData.tariff_name)) issues.push('Produkt/Tarif fehlt');
+        if (!isPresent(contractData.contract_duration_months)) issues.push('Laufzeit fehlt');
+    }
+
+    return issues;
 };
 
 /**
