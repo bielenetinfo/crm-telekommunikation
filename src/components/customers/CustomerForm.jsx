@@ -1,45 +1,13 @@
-import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { X } from "lucide-react";
+import { useCustomerForm } from "@/features/customers/hooks/useCustomerForm";
 
 export default function CustomerForm({ customer, branches = [], onSubmit, onCancel }) {
-  const [formData, setFormData] = useState({
-    first_name: "",
-    last_name: "",
-    email: "",
-    phone: "",
-    whatsapp: "",
-    address: "",
-    city: "",
-    postal_code: "",
-    birth_date: "",
-    customer_type: "privat",
-    branch_id: "",
-    notes: ""
-  });
-
-  useEffect(() => {
-    if (customer) {
-      setFormData({
-        first_name: customer.first_name || "",
-        last_name: customer.last_name || "",
-        email: customer.email || "",
-        phone: customer.phone || "",
-        whatsapp: customer.whatsapp || "",
-        address: customer.address || "",
-        city: customer.city || "",
-        postal_code: customer.postal_code || "",
-        birth_date: customer.birth_date || "",
-        customer_type: customer.customer_type || "privat",
-        branch_id: customer.branch_id || "",
-        notes: customer.notes || ""
-      });
-    }
-  }, [customer]);
+  const { formData, setFormData } = useCustomerForm(customer);
 
   const handleSubmit = (e) => {
     e.preventDefault();

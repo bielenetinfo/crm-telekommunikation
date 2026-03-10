@@ -1,4 +1,3 @@
-import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,54 +6,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { X } from "lucide-react";
 import { addMonths, format } from "date-fns";
+import { useContractForm } from "@/features/contracts/hooks/useContractForm";
 
 export default function ContractForm({ contract, customers, providers, branches, onSubmit, onCancel }) {
-  const [formData, setFormData] = useState({
-    customer_id: "",
-    provider_id: "",
-    branch_id: "",
-    contract_number: "",
-    category: "mobilfunk",
-    contract_type: "",
-    start_date: "",
-    end_date: "",
-    cancellation_period_months: 3,
-    monthly_fee: "",
-    total_commission: "",
-    status: "aktiv",
-    auto_renew: true,
-    notes: ""
-  });
-
-  useEffect(() => {
-    if (contract) {
-      setFormData({
-        customer_id: contract.customer_id || "",
-        provider_id: contract.provider_id || "",
-        branch_id: contract.branch_id || "",
-        contract_number: contract.contract_number || "",
-        category: contract.category || "mobilfunk",
-        contract_type: contract.contract_type || "",
-        start_date: contract.start_date || "",
-        end_date: contract.end_date || "",
-        cancellation_period_months: contract.cancellation_period_months || 3,
-        monthly_fee: contract.monthly_fee || "",
-        total_commission: contract.total_commission || "",
-        status: contract.status || "aktiv",
-        auto_renew: contract.auto_renew !== false,
-        notes: contract.notes || ""
-      });
-    }
-  }, [contract]);
-
-  const handleCustomerSelect = (customerId) => {
-    const customer = customers.find(c => c.id === customerId);
-    setFormData({
-      ...formData,
-      customer_id: customerId,
-      branch_id: customer?.branch_id || formData.branch_id
-    });
-  };
+  const { formData, setFormData, selectCustomer, setStartDate } = useContractForm(contract, { customers });
 
   const handleProviderSelect = (providerId) => {
     const provider = providers.find(p => p.id === providerId);
@@ -62,20 +17,6 @@ export default function ContractForm({ contract, customers, providers, branches,
       ...formData,
       provider_id: providerId
     });
-  };
-
-  const handleStartDateChange = (startDate) => {
-    if (startDate && formData.cancellation_period_months) {
-      const endDate = addMonths(new Date(startDate), 24);
-      const cancellationDeadline = addMonths(endDate, -formData.cancellation_period_months);
-      setFormData({
-        ...formData,
-        start_date: startDate,
-        end_date: format(endDate, 'yyyy-MM-dd')
-      });
-    } else {
-      setFormData({ ...formData, start_date: startDate });
-    }
   };
 
   const handleSubmit = (e) => {
@@ -113,7 +54,7 @@ export default function ContractForm({ contract, customers, providers, branches,
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label className="text-[#EAECEF]">Kunde *</Label>
-          <Select value={formData.customer_id} onValueChange={handleCustomerSelect}>
+          <Select value={formData.customer_id} onValueChange={selectCustomer}>
             <SelectTrigger className="h-11 bg-[#1F2228] border-[#2D3139] text-[#EAECEF]">
               <SelectValue placeholder="Kunde wählen..." />
             </SelectTrigger>
@@ -206,7 +147,7 @@ export default function ContractForm({ contract, customers, providers, branches,
           <Input
             type="date"
             value={formData.start_date}
-            onChange={(e) => handleStartDateChange(e.target.value)}
+            onChange={(e) => setStartDate(e.target.value)}
             required
             className="h-11 bg-[#1F2228] border-[#2D3139] text-[#EAECEF]"
           />
