@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +13,8 @@ import { useIsMobile } from "@/lib/hooks/useMediaQuery";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
+import { taskService } from "@/domain/task/service";
+import { mapQuickTaskInput } from "@/domain/task/mappers/taskMappers";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -36,11 +37,11 @@ export default function Tasks() {
 
   const { data: tasks = [], isLoading } = useQuery({
     queryKey: ['tasks'],
-    queryFn: () => base44.entities.Task.list()
+    queryFn: () => taskService.list()
   });
 
   const createTaskMutation = useMutation({
-    mutationFn: (data) => base44.entities.Task.create(data),
+    mutationFn: (data) => taskService.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       toast.success("Aufgabe erstellt");
@@ -50,17 +51,12 @@ export default function Tasks() {
   const handleCreateTask = () => {
     const title = window.prompt("Titel der Aufgabe:");
     if (title) {
-      createTaskMutation.mutate({
-        title,
-        status: 'offen',
-        priority: 'normal',
-        created_at: new Date().toISOString()
-      });
+      createTaskMutation.mutate(mapQuickTaskInput(title));
     }
   };
 
   const updateTaskStatusMutation = useMutation({
-    mutationFn: ({ id, status }) => base44.entities.Task.update(id, { status }),
+    mutationFn: ({ id, status }) => taskService.updateStatus(id, status),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       toast.success("Status aktualisiert");
@@ -151,10 +147,8 @@ export default function Tasks() {
             placeholder="Neue Aufgabe schnell erstellen... (Eingabetaste drücken)"
             onKeyDown={(e) => {
               if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-                base44.entities.Task.create({
-                  title: e.currentTarget.value,
-                  status: 'offen',
-                  priority: 'normal',
+                taskService.create({
+                  ...mapQuickTaskInput(e.currentTarget.value),
                   due_date: new Date().toISOString()
                 }).then(() => {
                   queryClient.invalidateQueries({ queryKey: ['tasks'] });

@@ -1,5 +1,4 @@
 import { useState, useDeferredValue } from "react";
-import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +15,7 @@ import { FloatingActionButton } from "@/components/ui/floating-action-button";
 import { useIsMobile } from "@/lib/hooks/useMediaQuery";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { motion } from "framer-motion";
+import { contractService } from "@/domain/contract/service";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -56,7 +56,7 @@ export default function Contracts() {
 
   const { data: allContracts = [], isLoading } = useQuery({
     queryKey: ['contracts'],
-    queryFn: () => base44.entities.Contract.list('-created_date')
+    queryFn: () => contractService.listVisible('-created_date')
   });
 
   // Filter out deleted contracts

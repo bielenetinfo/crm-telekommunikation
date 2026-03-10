@@ -1,5 +1,4 @@
 import { useState, useEffect, useDeferredValue } from "react";
-import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +14,8 @@ import { KpiCard } from "@/components/ui/kpi-card";
 import { startOfMonth, endOfMonth } from "date-fns";
 import { motion } from "framer-motion";
 import CustomerDetail from "@/pages/CustomerDetail";
+import { customerService } from "@/domain/customer/service";
+import { contractService } from "@/domain/contract/service";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -48,40 +49,15 @@ export default function Customers() {
 
   const { data: customers = [], isLoading } = useQuery({
     queryKey: ['customers'],
-    queryFn: () => base44.entities.Customer.list('-created_date')
+    queryFn: () => customerService.list('-created_date')
   });
 
   const { data: contracts = [] } = useQuery({
     queryKey: ['contracts'],
-    queryFn: () => base44.entities.Contract.list()
+    queryFn: () => contractService.list()
   });
 
-  const filteredCustomers = customers.filter(c => {
-    const searchLower = deferredSearch.toLowerCase();
-    const firstName = c.first_name?.toLowerCase() || '';
-    const lastName = c.last_name?.toLowerCase() || '';
-    const company = c.company_name?.toLowerCase() || '';
-    const email = c.email?.toLowerCase() || '';
-    const phone = c.phone || '';
-    const whatsapp = c.whatsapp || '';
-    const address = c.address?.toLowerCase() || '';
-    const city = c.city?.toLowerCase() || '';
-    const postalCode = c.postal_code || '';
-    const branchName = c.branch_name?.toLowerCase() || '';
-    const notes = c.notes?.toLowerCase() || '';
-
-    return firstName.includes(searchLower) ||
-      lastName.includes(searchLower) ||
-      company.includes(searchLower) ||
-      email.includes(searchLower) ||
-      phone.includes(deferredSearch) ||
-      whatsapp.includes(deferredSearch) ||
-      address.includes(searchLower) ||
-      city.includes(searchLower) ||
-      postalCode.includes(deferredSearch) ||
-      branchName.includes(searchLower) ||
-      notes.includes(searchLower);
-  });
+  const filteredCustomers = customerService.filterBySearch(customers, deferredSearch);
 
   // Calculate KPIs
   const today = new Date();
