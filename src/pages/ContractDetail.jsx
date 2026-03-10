@@ -1,6 +1,24 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useContractActivitiesQuery,
+  useContractCustomerHistoryQuery,
+  useContractBranchesQuery,
+  useContractCustomersQuery,
+  useContractFollowupsQuery,
+  useContractQuery,
+  useProvidersQuery,
+} from "@/features/contracts/api/contracts.hooks";
+import {
+  createActivity,
+  createContract,
+  createCustomerHistory,
+  createFollowup,
+  getVvlRecordById,
+  updateContract,
+  updateFollowup,
+  uploadCoreFile,
+} from "@/features/contracts/api/contracts.service";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -88,64 +106,26 @@ export default function ContractDetail() {
   });
   const [errors, setErrors] = useState({});
 
-  const { data: contract } = useQuery({
-    queryKey: ['contract', contractId],
-    queryFn: async () => {
-      const contracts = await base44.entities.Contract.list();
-      return contracts.find(c => c.id === contractId);
-    },
-    enabled: !!contractId && !isNew
-  });
+  const { data: contract } = useContractQuery(contractId, !isNew);
 
-  const { data: customers = [] } = useQuery({
-    queryKey: ['customers'],
-    queryFn: () => base44.entities.Customer.list()
-  });
+  const { data: customers = [] } = useContractCustomersQuery();
 
-  const { data: providers = [] } = useQuery({
-    queryKey: ['providers'],
-    queryFn: () => base44.entities.Provider.list()
-  });
+  const { data: providers = [] } = useProvidersQuery();
 
-  const { data: branches = [] } = useQuery({
-    queryKey: ['branches'],
-    queryFn: () => base44.entities.Branch.list()
-  });
+  const { data: branches = [] } = useContractBranchesQuery();
 
-  const { data: followups = [] } = useQuery({
-    queryKey: ['followups', contractId],
-    queryFn: async () => {
-      const allFollowups = await base44.entities.Followup.list();
-      return allFollowups.filter(f => f.contract_id === contractId);
-    },
-    enabled: !!contractId && !isNew
-  });
+  const { data: followups = [] } = useContractFollowupsQuery(contractId, !isNew);
 
-  const { data: activities = [] } = useQuery({
-    queryKey: ['activities', contractId],
-    queryFn: async () => {
-      const allActivities = await base44.entities.Activity.list('-created_date', 50);
-      return allActivities.filter(a => a.contract_id === contractId);
-    },
-    enabled: !!contractId && !isNew
-  });
+  const { data: activities = [] } = useContractActivitiesQuery(contractId, !isNew);
 
-  const { data: customerHistory = [] } = useQuery({
-    queryKey: ['customerHistory', contract?.customer_id],
-    queryFn: async () => {
-      const allHistory = await base44.entities.CustomerHistory.list('-occurred_at', 200);
-      return allHistory.filter(h => h.customer_id === contract.customer_id);
-    },
-    enabled: !!contract?.customer_id && !isNew
-  });
+  const { data: customerHistory = [] } = useContractCustomerHistoryQuery(contract?.customer_id, !isNew);
 
   // Fetch last VVL record
   useEffect(() => {
     const fetchLastVvl = async () => {
       if (contract?.last_vvl_id) {
         try {
-          const vvlRecords = await base44.entities.VvlRecord.list('-created_date', 1);
-          const record = vvlRecords.find(r => r.id === contract.last_vvl_id);
+          const record = await getVvlRecordById(contract.last_vvl_id);
           setLastVvlRecord(record || null);
         } catch (error) {
           console.error('Failed to fetch VVL record:', error);
@@ -232,7 +212,7 @@ export default function ContractDetail() {
       const customer = customers.find(c => c.id === data.customer_id);
       const provider = providers.find(p => p.id === data.provider_id);
 
-      const newContract = await base44.entities.Contract.create({
+      const newContract = await createContract({
         customer_id: data.customer_id,
         customer_name: customer ? (customer.customer_type === "geschäftlich" ? customer.company_name : `${customer.first_name} ${customer.last_name}`) : "",
         provider_id: data.provider_id,
@@ -265,7 +245,7 @@ export default function ContractDetail() {
         contract_documents: JSON.stringify(pendingDocuments)
       });
 
-      await base44.entities.Activity.create({
+      await createActivity({
         type: 'contract_created',
         customer_id: data.customer_id,
         customer_name: customer ? (customer.customer_type === "geschäftlich" ? customer.company_name : `${customer.first_name} ${customer.last_name}`) : "",
@@ -295,7 +275,7 @@ export default function ContractDetail() {
       const customer = customers.find(c => c.id === data.customer_id);
       const provider = providers.find(p => p.id === data.provider_id);
 
-      await base44.entities.Contract.update(contractId, {
+      await updateContract(contractId, {
         customer_id: data.customer_id,
         customer_name: customer ? (customer.customer_type === "geschäftlich" ? customer.company_name : `${customer.first_name} ${customer.last_name}`) : "",
         provider_id: data.provider_id,
@@ -327,7 +307,7 @@ export default function ContractDetail() {
         tv_option: data.tv_option || ""
       });
 
-      await base44.entities.Activity.create({
+      await createActivity({
         type: 'contract_updated',
         customer_id: data.customer_id,
         customer_name: contract.customer_name,
@@ -351,14 +331,14 @@ export default function ContractDetail() {
 
   const startVvlMutation = useMutation({
     mutationFn: async () => {
-      await base44.entities.Contract.update(contractId, {
+      await updateContract(contractId, {
         vvl_status: 'in_bearbeitung',
         vvl_started_at: format(new Date(), 'yyyy-MM-dd')
       });
 
       const existingOpenFollowup = followups.find(f => f.status === 'open');
       if (!existingOpenFollowup) {
-        await base44.entities.Followup.create({
+        await createFollowup({
           contract_id: contractId,
           customer_id: contract.customer_id,
           customer_name: contract.customer_name,
@@ -370,7 +350,7 @@ export default function ContractDetail() {
         });
       }
 
-      await base44.entities.Activity.create({
+      await createActivity({
         type: 'vvl_started',
         customer_id: contract.customer_id,
         customer_name: contract.customer_name,
@@ -396,12 +376,12 @@ export default function ContractDetail() {
 
   const completeVvlMutation = useMutation({
     mutationFn: async ({ outcome, notes }) => {
-      await base44.entities.Contract.update(contractId, {
+      await updateContract(contractId, {
         vvl_status: outcome,
         status: outcome === 'verlängert' ? 'verlängert' : contract.status
       });
 
-      await base44.entities.Activity.create({
+      await createActivity({
         type: 'followup_completed',
         customer_id: contract.customer_id,
         customer_name: contract.customer_name,
@@ -420,7 +400,7 @@ export default function ContractDetail() {
       // Close all open followups
       const openFollowups = followups.filter(f => f.status === 'open');
       for (const f of openFollowups) {
-        await base44.entities.Followup.update(f.id, { status: 'done', vvl_action: outcome });
+        await updateFollowup(f.id, { status: 'done', vvl_action: outcome });
       }
     },
     onSuccess: () => {
@@ -498,7 +478,7 @@ export default function ContractDetail() {
 
     setUploadingContract(true);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const { file_url } = await uploadCoreFile(file);
 
       const newDoc = {
         url: file_url,
@@ -531,7 +511,7 @@ export default function ContractDetail() {
         ? customer.company_name
         : `${customer.first_name} ${customer.last_name}`;
 
-      return base44.entities.CustomerHistory.create({
+      return createCustomerHistory({
         customer_id: contract.customer_id,
         customer_name: customerName,
         type: data.type,
@@ -555,7 +535,7 @@ export default function ContractDetail() {
   const deleteContractMutation = useMutation({
     mutationFn: async () => {
       // Log deletion to history first
-      await base44.entities.CustomerHistory.create({
+      await createCustomerHistory({
         customer_id: contract.customer_id,
         customer_name: contract.customer_name,
         type: 'system',
@@ -570,7 +550,7 @@ export default function ContractDetail() {
         is_system_event: true
       });
 
-      await base44.entities.Contract.update(contractId, {
+      await updateContract(contractId, {
         is_deleted: true,
         deleted_at: new Date().toISOString(),
         status: 'abgelaufen'
@@ -1059,9 +1039,9 @@ export default function ContractDetail() {
                         </p>
                       </div>
                       <Select onValueChange={(value) => {
-                        base44.entities.Followup.update(followup.id, { status: 'done', vvl_action: value });
-                        base44.entities.Contract.update(contractId, { vvl_status: value });
-                        base44.entities.Activity.create({
+                        updateFollowup(followup.id, { status: 'done', vvl_action: value });
+                        updateContract(contractId, { vvl_status: value });
+                        createActivity({
                           type: 'followup_completed',
                           customer_id: contract.customer_id,
                           customer_name: contract.customer_name,

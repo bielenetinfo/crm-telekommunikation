@@ -1,6 +1,5 @@
 import { useState, useDeferredValue } from "react";
-import { base44 } from "@/api/base44Client";
-import { useQuery } from "@tanstack/react-query";
+import { useContractsQuery } from "@/features/contracts/api/contracts.hooks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -54,10 +53,7 @@ export default function Contracts() {
   const deferredSearch = useDeferredValue(search);
   const [statusFilter, setStatusFilter] = useState("aktiv");
 
-  const { data: allContracts = [], isLoading } = useQuery({
-    queryKey: ['contracts'],
-    queryFn: () => base44.entities.Contract.list('-created_date')
-  });
+  const { data: allContracts = [], isLoading } = useContractsQuery();
 
   // Filter out deleted contracts
   const contracts = allContracts.filter(c => !c.is_deleted);
