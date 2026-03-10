@@ -28,10 +28,11 @@ import { normalizeAddress } from "@/utils/addressNormalization";
 import TimelineV2 from "../components/history/TimelineV2";
 import QuickAddModal from "../components/history/QuickAddModal";
 import { getAppointments, getOpenFollowups } from "@/components/utils/calendar";
-import { logDocumentUploaded } from "@/components/utils/historyLogger";
+import { logDocumentUploaded, logStatusChange } from "@/components/utils/historyLogger";
 import { FloatingActionButton } from "@/components/ui/floating-action-button";
 import { useIsMobile } from "@/lib/hooks/useMediaQuery";
-import { validateCustomerData } from "@/lib/validators";
+import { validateCustomerData, validateStatusTransition } from "@/lib/validators";
+import { getNextHappyPathStep } from "@/lib/statusModels";
 import { motion } from "framer-motion";
 
 const pageVariants = {
@@ -218,10 +219,20 @@ export default function CustomerDetail({ isSplitView = false }) {
   });
 
   const completeDraftMutation = useMutation({
-    mutationFn: () => {
-      return base44.entities.Customer.update(customerId, {
+    mutationFn: async () => {
+      validateStatusTransition({ entityKey: 'customers', fromStatus: customer?.status, toStatus: 'complete' });
+
+      await base44.entities.Customer.update(customerId, {
         dsgvo_document_url: dsgvoUploadedUrl || "",
         status: "complete"
+      });
+
+      await logStatusChange({
+        entity: 'Customer',
+        fromStatus: customer?.status,
+        toStatus: 'complete',
+        customerId,
+        customerName: getCustomerDisplayName()
       });
     },
     onSuccess: () => {
@@ -499,6 +510,8 @@ export default function CustomerDetail({ isSplitView = false }) {
     return `${customer.first_name} ${customer.last_name}`;
   };
 
+  const nextCustomerStep = customer ? getNextHappyPathStep('customers', customer.status) : null;
+
   return (
     <motion.div
       variants={pageVariants}
@@ -555,6 +568,23 @@ export default function CustomerDetail({ isSplitView = false }) {
                 </Button>
               </div>
             </div>
+          </div>
+        </Card>
+      )}
+
+      {!isNew && customer && nextCustomerStep && (
+        <Card className="p-4 bg-card border border-border">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold">Nächster sinnvoller Schritt</h3>
+              <p className="text-xs text-muted-foreground">Status von {customer.status} → {nextCustomerStep.status}</p>
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => navigate(`${createPageUrl('ContractDetail')}?new=true&customer_id=${customerId}`)}
+            >
+              {nextCustomerStep.status === 'aktiv' ? 'Vertrag anlegen' : 'Weiter'}
+            </Button>
           </div>
         </Card>
       )}

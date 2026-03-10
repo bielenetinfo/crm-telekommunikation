@@ -4,6 +4,7 @@
  */
 
 import DOMPurify from 'dompurify';
+import { isValidStatusTransition } from '@/lib/statusModels';
 
 /**
  * Very simple password policy:
@@ -104,6 +105,10 @@ export const validateCustomerData = (data) => {
         errors.push('Firmenname muss zwischen 1 und 200 Zeichen lang sein');
     }
 
+    if (!data.phone || !data.phone.trim()) {
+        errors.push('Telefonnummer ist ein Pflichtfeld');
+    }
+
     if (errors.length > 0) {
         throw new Error(errors.join(', '));
     }
@@ -131,6 +136,10 @@ export const validateCustomerData = (data) => {
 export const validateContractData = (data) => {
     const errors = [];
 
+    if (!data.customer_id) {
+        errors.push('Kunde muss ausgewählt werden');
+    }
+
     // Contract number validation
     if (data.contract_number && !validateLength(data.contract_number, 1, 50)) {
         errors.push('Vertragsnummer muss zwischen 1 und 50 Zeichen lang sein');
@@ -139,6 +148,10 @@ export const validateContractData = (data) => {
     // Tariff name validation
     if (data.tariff_name && !validateLength(data.tariff_name, 1, 200)) {
         errors.push('Tarifname muss zwischen 1 und 200 Zeichen lang sein');
+    }
+
+    if (!data.start_date) {
+        errors.push('Vertragsbeginn ist ein Pflichtfeld');
     }
 
     if (errors.length > 0) {
@@ -154,4 +167,11 @@ export const validateContractData = (data) => {
     if (sanitized.vvl_notes) sanitized.vvl_notes = escapeHtml(sanitized.vvl_notes);
 
     return sanitized;
+};
+
+export const validateStatusTransition = ({ entityKey, fromStatus, toStatus }) => {
+    if (!isValidStatusTransition(entityKey, fromStatus, toStatus)) {
+        throw new Error(`Ungültiger Statuswechsel: ${fromStatus || '-'} → ${toStatus || '-'}`);
+    }
+    return true;
 };

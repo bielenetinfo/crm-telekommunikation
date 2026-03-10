@@ -7,8 +7,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { X } from "lucide-react";
 import { addMonths, format } from "date-fns";
+import { validateContractData } from "@/lib/validators";
+import { ENTITY_STATUS_MODELS } from "@/lib/statusModels";
 
 export default function ContractForm({ contract, customers, providers, branches, onSubmit, onCancel }) {
+  const [error, setError] = useState("");
   const [formData, setFormData] = useState({
     customer_id: "",
     provider_id: "",
@@ -47,6 +50,8 @@ export default function ContractForm({ contract, customers, providers, branches,
     }
   }, [contract]);
 
+  const contractStatuses = ENTITY_STATUS_MODELS.contracts.statuses;
+
   const handleCustomerSelect = (customerId) => {
     const customer = customers.find(c => c.id === customerId);
     setFormData({
@@ -80,6 +85,14 @@ export default function ContractForm({ contract, customers, providers, branches,
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    try {
+      validateContractData(formData);
+      setError("");
+    } catch (validationError) {
+      setError(validationError.message || "Bitte Eingaben prüfen");
+      return;
+    }
+
     const customer = customers.find(c => c.id === formData.customer_id);
     const provider = providers.find(p => p.id === formData.provider_id);
     const branch = branches.find(b => b.id === formData.branch_id);
@@ -266,11 +279,11 @@ export default function ContractForm({ contract, customers, providers, branches,
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="bg-[#1F2228] border-[#2D3139]">
-              <SelectItem value="aktiv" className="text-[#EAECEF]">Aktiv</SelectItem>
-              <SelectItem value="gekündigt" className="text-[#EAECEF]">Gekündigt</SelectItem>
-              <SelectItem value="abgelaufen" className="text-[#EAECEF]">Abgelaufen</SelectItem>
-              <SelectItem value="verlängert" className="text-[#EAECEF]">Verlängert</SelectItem>
-              <SelectItem value="pausiert" className="text-[#EAECEF]">Pausiert</SelectItem>
+              {contractStatuses.map(status => (
+                <SelectItem key={status} value={status} className="text-[#EAECEF]">
+                  {status.charAt(0).toUpperCase() + status.slice(1)}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -296,6 +309,8 @@ export default function ContractForm({ contract, customers, providers, branches,
           className="bg-[#1F2228] border-[#2D3139] text-[#EAECEF]"
         />
       </div>
+
+      {error && <p className="text-sm text-red-500">{error}</p>}
 
       <div className="flex justify-end gap-3 pt-4">
         <Button type="button" variant="outline" onClick={onCancel} className="border-[#2D3139] text-[#9CA3AF]">

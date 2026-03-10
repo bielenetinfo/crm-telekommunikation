@@ -17,6 +17,8 @@ export async function logCustomerEvent({
   tags = [],
   dueAt = null
 }) {
+  if (!customerId) return;
+
   try {
     await base44.entities.CustomerHistory.create({
       customer_id: customerId,
@@ -36,6 +38,18 @@ export async function logCustomerEvent({
   } catch (error) {
     console.error("Failed to log customer event:", error);
   }
+}
+
+export async function logStatusChange({ entity, fromStatus, toStatus, customerId, customerName, contractId = null, notes = "" }) {
+  return logCustomerEvent({
+    customerId,
+    customerName,
+    contractId,
+    type: "system",
+    title: `${entity} Status geändert`,
+    notes: `${fromStatus || "-"} → ${toStatus}${notes ? ` • ${notes}` : ""}`,
+    tags: ["status_change", entity.toLowerCase(), `${fromStatus || 'none'}_to_${toStatus}`]
+  });
 }
 
 export async function logContractCreated(customerId, customerName, contractId, providerName, category) {

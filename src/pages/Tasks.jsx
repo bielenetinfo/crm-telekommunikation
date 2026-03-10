@@ -14,6 +14,9 @@ import { useIsMobile } from "@/lib/hooks/useMediaQuery";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
+import { ENTITY_STATUS_MODELS } from "@/lib/statusModels";
+import { validateStatusTransition } from "@/lib/validators";
+import { logStatusChange } from "@/components/utils/historyLogger";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -33,6 +36,7 @@ export default function Tasks() {
   const isMobile = useIsMobile();
   const [filter, setFilter] = useState("all"); // all, open, done
   const [search, setSearch] = useState("");
+  const taskStatusOptions = ENTITY_STATUS_MODELS.tasks.statuses;
 
   const { data: tasks = [], isLoading } = useQuery({
     queryKey: ['tasks'],
@@ -60,7 +64,18 @@ export default function Tasks() {
   };
 
   const updateTaskStatusMutation = useMutation({
-    mutationFn: ({ id, status }) => base44.entities.Task.update(id, { status }),
+    mutationFn: async ({ task, status }) => {
+      validateStatusTransition({ entityKey: 'tasks', fromStatus: task.status, toStatus: status });
+      await base44.entities.Task.update(task.id, { status });
+      await logStatusChange({
+        entity: 'Task',
+        fromStatus: task.status,
+        toStatus: status,
+        customerId: task.customer_id,
+        customerName: task.customer_name,
+        notes: task.title
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       toast.success("Status aktualisiert");
@@ -182,7 +197,7 @@ export default function Tasks() {
             />
           </div>
           <div className="flex gap-1 p-1 bg-secondary/50 rounded-lg">
-            {['all', 'offen', 'erledigt'].map(f => (
+            {['all', ...taskStatusOptions].map(f => (
               <Button
                 key={f}
                 variant="ghost"
@@ -229,7 +244,7 @@ export default function Tasks() {
                 <div className="h-1.5 bg-gradient-to-r from-primary via-orange-400 to-primary/50"></div>
                 <div className="flex items-center p-5 gap-6">
                   <button
-                    onClick={() => updateTaskStatusMutation.mutate({ id: t.id, status: t.status === 'erledigt' ? 'offen' : 'erledigt' })}
+                    onClick={() => updateTaskStatusMutation.mutate({ task: t, status: t.status === 'erledigt' ? 'offen' : 'erledigt' })}
                     className={cn(
                       "h-10 w-10 rounded-2xl border-2 flex items-center justify-center flex-shrink-0   shadow-lg",
                       t.status === 'erledigt'

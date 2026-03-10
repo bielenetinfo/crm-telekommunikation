@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { X } from "lucide-react";
+import { validateCustomerData } from "@/lib/validators";
 
 export default function CustomerForm({ customer, branches = [], onSubmit, onCancel }) {
   const [formData, setFormData] = useState({
@@ -21,6 +22,8 @@ export default function CustomerForm({ customer, branches = [], onSubmit, onCanc
     branch_id: "",
     notes: ""
   });
+
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (customer) {
@@ -43,7 +46,13 @@ export default function CustomerForm({ customer, branches = [], onSubmit, onCanc
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSubmit(formData);
+    try {
+      validateCustomerData(formData);
+      setError("");
+      onSubmit(formData);
+    } catch (validationError) {
+      setError(validationError.message || "Bitte Eingaben prüfen");
+    }
   };
 
   return (
@@ -192,6 +201,8 @@ export default function CustomerForm({ customer, branches = [], onSubmit, onCanc
           rows={3}
         />
       </div>
+
+      {error && <p className="text-sm text-red-500">{error}</p>}
 
       <div className="flex justify-end gap-3 pt-4">
         <Button type="button" variant="outline" onClick={onCancel}>

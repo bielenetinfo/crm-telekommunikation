@@ -19,7 +19,7 @@ import VvlWizard from "@/components/contracts/VvlWizard";
 import HistoryPreview from "@/components/history/HistoryPreview";
 import QuickAddModal from "@/components/history/QuickAddModal";
 import CancellationModal from "@/components/contracts/CancellationModal";
-import { logContractCreated, logContractUpdated, logVvlStarted, logVvlCompleted } from "@/components/utils/historyLogger";
+import { logContractCreated, logContractUpdated, logVvlStarted, logVvlCompleted, logStatusChange } from "@/components/utils/historyLogger";
 import ContractFormFields from "@/components/contracts/ContractFormFields";
 import ContractDocuments from "@/components/contracts/ContractDocuments";
 import { generateContractPDF, getContractFileName } from "@/components/pdf/contractPdf";
@@ -27,7 +27,8 @@ import { downloadBlob, createBlobURL, revokeBlobURL } from "@/components/pdf/dow
 import { toast } from "sonner";
 import { FloatingActionButton } from "@/components/ui/floating-action-button";
 import { useIsMobile } from "@/lib/hooks/useMediaQuery";
-import { validateContractData } from "@/lib/validators";
+import { validateContractData, validateStatusTransition } from "@/lib/validators";
+import { ENTITY_STATUS_MODELS, getAllowedTransitions, getNextHappyPathStep } from "@/lib/statusModels";
 import { motion } from "framer-motion";
 
 const pageVariants = {
@@ -87,6 +88,10 @@ export default function ContractDetail() {
     cancellation_deadline: null
   });
   const [errors, setErrors] = useState({});
+  const contractStatusOptions = ENTITY_STATUS_MODELS.contracts.statuses;
+  const vvlStatusOptions = ENTITY_STATUS_MODELS.vvl.statuses;
+  const statusLabel = (value) => value.replaceAll('_', ' ').split(' ').map(part => part ? part[0].toUpperCase() + part.slice(1) : part).join(' ');
+
 
   const { data: contract } = useQuery({
     queryKey: ['contract', contractId],
@@ -295,6 +300,11 @@ export default function ContractDetail() {
       const customer = customers.find(c => c.id === data.customer_id);
       const provider = providers.find(p => p.id === data.provider_id);
 
+      if (contract) {
+        validateStatusTransition({ entityKey: 'contracts', fromStatus: contract.status, toStatus: data.status });
+        validateStatusTransition({ entityKey: 'vvl', fromStatus: contract.vvl_status, toStatus: data.vvl_status });
+      }
+
       await base44.entities.Contract.update(contractId, {
         customer_id: data.customer_id,
         customer_name: customer ? (customer.customer_type === "geschäftlich" ? customer.company_name : `${customer.first_name} ${customer.last_name}`) : "",
@@ -342,6 +352,28 @@ export default function ContractDetail() {
         contractId,
         "Vertragsdaten wurden geändert"
       );
+
+      if (contract?.status !== data.status) {
+        await logStatusChange({
+          entity: 'Contract',
+          fromStatus: contract?.status,
+          toStatus: data.status,
+          customerId: data.customer_id,
+          customerName: contract.customer_name,
+          contractId
+        });
+      }
+
+      if (contract?.vvl_status !== data.vvl_status) {
+        await logStatusChange({
+          entity: 'VVL',
+          fromStatus: contract?.vvl_status,
+          toStatus: data.vvl_status,
+          customerId: data.customer_id,
+          customerName: contract.customer_name,
+          contractId
+        });
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contract', contractId] });
@@ -354,6 +386,15 @@ export default function ContractDetail() {
       await base44.entities.Contract.update(contractId, {
         vvl_status: 'in_bearbeitung',
         vvl_started_at: format(new Date(), 'yyyy-MM-dd')
+      });
+
+      await logStatusChange({
+        entity: 'VVL',
+        fromStatus: contract?.vvl_status,
+        toStatus: 'in_bearbeitung',
+        customerId: contract.customer_id,
+        customerName: contract.customer_name,
+        contractId
       });
 
       const existingOpenFollowup = followups.find(f => f.status === 'open');
@@ -396,10 +437,32 @@ export default function ContractDetail() {
 
   const completeVvlMutation = useMutation({
     mutationFn: async ({ outcome, notes }) => {
+      const nextContractStatus = outcome === 'verlängert' ? 'verlängert' : contract.status;
+
       await base44.entities.Contract.update(contractId, {
         vvl_status: outcome,
-        status: outcome === 'verlängert' ? 'verlängert' : contract.status
+        status: nextContractStatus
       });
+
+      await logStatusChange({
+        entity: 'VVL',
+        fromStatus: contract?.vvl_status,
+        toStatus: outcome,
+        customerId: contract.customer_id,
+        customerName: contract.customer_name,
+        contractId
+      });
+
+      if (contract?.status !== nextContractStatus) {
+        await logStatusChange({
+          entity: 'Contract',
+          fromStatus: contract?.status,
+          toStatus: nextContractStatus,
+          customerId: contract.customer_id,
+          customerName: contract.customer_name,
+          contractId
+        });
+      }
 
       await base44.entities.Activity.create({
         type: 'followup_completed',
@@ -445,12 +508,16 @@ export default function ContractDetail() {
   const validateContractForm = () => {
     const newErrors = {};
     if (!formData.customer_id) newErrors.customer_id = "Kunde auswählen";
+    if (!formData.provider_id) newErrors.provider_id = "Provider auswählen";
+    if (!formData.start_date) newErrors.start_date = "Vertragsbeginn ist Pflicht";
     if (!formData.contract_number?.trim()) newErrors.contract_number = "Vertragsnummer ist Pflicht";
     if (!formData.contract_duration_months) newErrors.contract_duration_months = "Laufzeit wählen";
     if (!formData.category) newErrors.category = "Kategorie auswählen";
 
     try {
       validateContractData({
+        customer_id: formData.customer_id,
+        start_date: formData.start_date,
         contract_number: formData.contract_number,
         tariff_name: formData.tariff_name,
         tariff_details: formData.tariff_details
@@ -583,6 +650,9 @@ export default function ContractDetail() {
     }
   });
 
+  const nextContractStep = contract ? getNextHappyPathStep('contracts', contract.status) : null;
+  const nextVvlStep = contract ? getNextHappyPathStep('vvl', contract.vvl_status) : null;
+
   return (
     <motion.div
       variants={pageVariants}
@@ -681,6 +751,24 @@ export default function ContractDetail() {
           </Button>
         )}
       </div>
+
+      {!isNew && contract && (nextContractStep || nextVvlStep) && (
+        <Card className="p-4 bg-card border border-border">
+          <h3 className="text-sm font-semibold text-foreground mb-2">Nächster sinnvoller Schritt</h3>
+          <div className="flex flex-wrap gap-2">
+            {nextContractStep && (
+              <Button variant="outline" className="border-border" onClick={() => setFormData(prev => ({ ...prev, status: nextContractStep.status }))}>
+                Vertragsstatus → {statusLabel(nextContractStep.status)}
+              </Button>
+            )}
+            {nextVvlStep && (
+              <Button variant="outline" className="border-border" onClick={() => setFormData(prev => ({ ...prev, vvl_status: nextVvlStep.status }))}>
+                VVL-Status → {statusLabel(nextVvlStep.status)}
+              </Button>
+            )}
+          </div>
+        </Card>
+      )}
 
       {/* Success Message nach Erstellen */}
       {!isNew && contract && justCreated && (
@@ -877,10 +965,14 @@ export default function ContractDetail() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-[#1F2228] border-[#2D3139]">
-                <SelectItem value="aktiv" className="text-[#EAECEF]">Aktiv</SelectItem>
-                <SelectItem value="gekündigt" className="text-[#EAECEF]">Gekündigt</SelectItem>
-                <SelectItem value="abgelaufen" className="text-[#EAECEF]">Abgelaufen</SelectItem>
-                <SelectItem value="verlängert" className="text-[#EAECEF]">Verlängert</SelectItem>
+                {contractStatusOptions.map(status => {
+                  const allowed = !contract || status === contract.status || getAllowedTransitions('contracts', contract.status).includes(status);
+                  return (
+                    <SelectItem key={status} value={status} className="text-[#EAECEF]" disabled={!allowed}>
+                      {statusLabel(status)}
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
           </div>
@@ -1059,25 +1151,36 @@ export default function ContractDetail() {
                         </p>
                       </div>
                       <Select onValueChange={(value) => {
-                        base44.entities.Followup.update(followup.id, { status: 'done', vvl_action: value });
-                        base44.entities.Contract.update(contractId, { vvl_status: value });
-                        base44.entities.Activity.create({
-                          type: 'followup_completed',
-                          customer_id: contract.customer_id,
-                          customer_name: contract.customer_name,
-                          contract_id: contractId,
-                          short_text: `Follow-up: ${value}`
-                        });
-                        queryClient.invalidateQueries();
+                        void (async () => {
+                          await base44.entities.Followup.update(followup.id, { status: 'done', vvl_action: value });
+                          await base44.entities.Contract.update(contractId, { vvl_status: value });
+                          await base44.entities.Activity.create({
+                            type: 'followup_completed',
+                            customer_id: contract.customer_id,
+                            customer_name: contract.customer_name,
+                            contract_id: contractId,
+                            short_text: `Follow-up: ${value}`
+                          });
+                          await logStatusChange({
+                            entity: 'VVL',
+                            fromStatus: contract?.vvl_status,
+                            toStatus: value,
+                            customerId: contract.customer_id,
+                            customerName: contract.customer_name,
+                            contractId
+                          });
+                          queryClient.invalidateQueries();
+                        })();
                       }}>
                         <SelectTrigger className="bg-[#1F2228] border-[#2D3139] text-[#EAECEF] w-48">
                           <SelectValue placeholder="Erledigt als..." />
                         </SelectTrigger>
                         <SelectContent className="bg-[#1F2228] border-[#2D3139]">
-                          <SelectItem value="kunde_kontaktiert" className="text-[#EAECEF]">Kunde kontaktiert</SelectItem>
-                          <SelectItem value="angebot_erstellt" className="text-[#EAECEF]">Angebot erstellt</SelectItem>
-                          <SelectItem value="verlängert" className="text-[#EAECEF]">Verlängert</SelectItem>
-                          <SelectItem value="gekündigt" className="text-[#EAECEF]">Gekündigt</SelectItem>
+                          {vvlStatusOptions
+                            .filter(status => getAllowedTransitions('vvl', contract.vvl_status).includes(status))
+                            .map(status => (
+                              <SelectItem key={status} value={status} className="text-[#EAECEF]">{statusLabel(status)}</SelectItem>
+                            ))}
                         </SelectContent>
                       </Select>
                     </div>

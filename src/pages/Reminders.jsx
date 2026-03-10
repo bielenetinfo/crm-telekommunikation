@@ -11,6 +11,9 @@ import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
+import { ENTITY_STATUS_MODELS } from "@/lib/statusModels";
+import { validateStatusTransition } from "@/lib/validators";
+import { logStatusChange } from "@/components/utils/historyLogger";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -44,6 +47,7 @@ export default function Reminders() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("offen");
   const queryClient = useQueryClient();
+  const reminderStatusOptions = ENTITY_STATUS_MODELS.reminders.statuses;
 
   const { data: reminders = [], isLoading } = useQuery({
     queryKey: ['reminders'],
@@ -51,27 +55,43 @@ export default function Reminders() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Reminder.update(id, data),
+    mutationFn: async ({ id, data, reminder }) => {
+      await base44.entities.Reminder.update(id, data);
+      if (reminder?.status !== data.status) {
+        await logStatusChange({
+          entity: 'Reminder',
+          fromStatus: reminder?.status,
+          toStatus: data.status,
+          customerId: reminder?.customer_id,
+          customerName: reminder?.customer_name,
+          contractId: reminder?.contract_id
+        });
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reminders'] });
     }
   });
 
-  const handleSend = (reminder, via) => {
+  const handleSend = async (reminder, via) => {
+    validateStatusTransition({ entityKey: 'reminders', fromStatus: reminder.status, toStatus: 'versendet' });
     updateMutation.mutate({
       id: reminder.id,
       data: {
         status: 'versendet',
         sent_date: format(new Date(), 'yyyy-MM-dd'),
         sent_via: via
-      }
+      },
+      reminder
     });
   };
 
   const handleStatusChange = (reminder, status) => {
+    validateStatusTransition({ entityKey: 'reminders', fromStatus: reminder.status, toStatus: status });
     updateMutation.mutate({
       id: reminder.id,
-      data: { status }
+      data: { status },
+      reminder
     });
   };
 
@@ -114,9 +134,11 @@ export default function Reminders() {
         </div>
         <Tabs value={statusFilter} onValueChange={setStatusFilter}>
           <TabsList className="bg-secondary">
-            <TabsTrigger value="offen" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Offen</TabsTrigger>
-            <TabsTrigger value="versendet" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Versendet</TabsTrigger>
-            <TabsTrigger value="erledigt" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Erledigt</TabsTrigger>
+            {reminderStatusOptions.map(status => (
+              <TabsTrigger key={status} value={status} className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                {status.charAt(0).toUpperCase() + status.slice(1)}
+              </TabsTrigger>
+            ))}
             <TabsTrigger value="all" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Alle</TabsTrigger>
           </TabsList>
         </Tabs>
