@@ -123,7 +123,7 @@ export default function Dashboard() {
       >
         {/* KPI 1: Kunden */}
         <motion.div variants={itemVariants}>
-          <Card className="glass-card card-premium p-4 md:p-5 rounded-2xl md:rounded-3xl group transition-all duration-300 border-white/5 relative overflow-hidden flex flex-col justify-between h-full min-h-[118px] md:min-h-[124px] cursor-pointer hover:shadow-xl hover:-translate-y-1 hover:border-white/10 motion-reduce:transform-none" onClick={() => navigate('/customers')}>
+          <Card className="glass-card card-premium p-4 md:p-5 rounded-2xl md:rounded-3xl group transition-all duration-300 border-white/5 relative overflow-hidden flex flex-col justify-between h-full min-h-[118px] md:min-h-[124px] cursor-pointer hover:shadow-xl hover:-translate-y-1 hover:border-white/10 motion-reduce:transform-none" onClick={() => navigate(createPageUrl('Customers'))}>
             {/* Top: Icon */}
             <div className="w-10 h-10 md:w-11 md:h-11 rounded-xl md:rounded-2xl bg-gradient-to-br from-blue-500/20 to-blue-500/5 text-blue-400 flex flex-col items-center justify-center shadow-inner border border-blue-500/20 group-hover:shadow-[0_0_20px_rgba(59,130,246,0.2)] transition-shadow mb-3">
               <Users className="h-5 w-5 md:h-6 md:w-6" />
@@ -143,7 +143,7 @@ export default function Dashboard() {
 
         {/* KPI 2: Verträge */}
         <motion.div variants={itemVariants}>
-          <Card className="glass-card card-premium p-4 md:p-5 rounded-2xl md:rounded-3xl group transition-all duration-300 border-white/5 relative overflow-hidden flex flex-col justify-between h-full min-h-[118px] md:min-h-[124px] cursor-pointer hover:shadow-xl hover:-translate-y-1 hover:border-white/10 motion-reduce:transform-none" onClick={() => navigate('/contracts')}>
+          <Card className="glass-card card-premium p-4 md:p-5 rounded-2xl md:rounded-3xl group transition-all duration-300 border-white/5 relative overflow-hidden flex flex-col justify-between h-full min-h-[118px] md:min-h-[124px] cursor-pointer hover:shadow-xl hover:-translate-y-1 hover:border-white/10 motion-reduce:transform-none" onClick={() => navigate(createPageUrl('Contracts'))}>
             {/* Top: Icon */}
             <div className="w-10 h-10 md:w-11 md:h-11 rounded-xl md:rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 text-primary flex flex-col items-center justify-center shadow-inner border border-primary/20 group-hover:shadow-[0_0_20px_rgba(255,195,0,0.2)] transition-shadow mb-3">
               <FileText className="h-5 w-5 md:h-6 md:w-6" />
@@ -163,7 +163,7 @@ export default function Dashboard() {
 
         {/* KPI 3: Provision */}
         <motion.div variants={itemVariants}>
-          <Card className="glass-card card-premium p-4 md:p-5 rounded-2xl md:rounded-3xl group transition-all duration-300 border-white/5 relative overflow-hidden flex flex-col justify-between h-full min-h-[118px] md:min-h-[124px] cursor-pointer hover:shadow-xl hover:-translate-y-1 hover:border-white/10 motion-reduce:transform-none" onClick={() => navigate('/contracts')}>
+          <Card className="glass-card card-premium p-4 md:p-5 rounded-2xl md:rounded-3xl group transition-all duration-300 border-white/5 relative overflow-hidden flex flex-col justify-between h-full min-h-[118px] md:min-h-[124px] cursor-pointer hover:shadow-xl hover:-translate-y-1 hover:border-white/10 motion-reduce:transform-none" onClick={() => navigate(createPageUrl('Contracts'))}>
             {/* Top: Icon */}
             <div className="w-10 h-10 md:w-11 md:h-11 rounded-xl md:rounded-2xl bg-gradient-to-br from-emerald-500/20 to-emerald-500/5 text-emerald-400 flex flex-col items-center justify-center shadow-inner border border-emerald-500/20 group-hover:shadow-[0_0_20px_rgba(16,185,129,0.2)] transition-shadow mb-3">
               <TrendingUp className="h-5 w-5 md:h-6 md:w-6" />
@@ -183,7 +183,7 @@ export default function Dashboard() {
 
         {/* KPI 4: Offene VVL */}
         <motion.div variants={itemVariants}>
-          <Card className="glass-card card-premium p-4 md:p-5 rounded-2xl md:rounded-3xl group transition-all duration-300 border-white/5 relative overflow-hidden flex flex-col justify-between h-full min-h-[118px] md:min-h-[124px] cursor-pointer hover:shadow-xl hover:-translate-y-1 hover:border-white/10 motion-reduce:transform-none" onClick={() => navigate('/vvl')}>
+          <Card className="glass-card card-premium p-4 md:p-5 rounded-2xl md:rounded-3xl group transition-all duration-300 border-white/5 relative overflow-hidden flex flex-col justify-between h-full min-h-[118px] md:min-h-[124px] cursor-pointer hover:shadow-xl hover:-translate-y-1 hover:border-white/10 motion-reduce:transform-none" onClick={() => navigate(createPageUrl('VVL'))}>
             {/* Top: Icon */}
             <div className="w-10 h-10 md:w-11 md:h-11 rounded-xl md:rounded-2xl bg-gradient-to-br from-rose-500/20 to-rose-500/5 text-rose-400 flex flex-col items-center justify-center shadow-inner border border-rose-500/20 group-hover:shadow-[0_0_20px_rgba(244,63,94,0.2)] transition-shadow mb-3">
               <Sparkles className="h-5 w-5 md:h-6 md:w-6" />
@@ -230,7 +230,7 @@ export default function Dashboard() {
                 <div className="flex-1 flex flex-col items-center justify-center text-center py-4">
                   <p className="text-sm font-bold text-foreground mb-2">Keine Aktivitäten</p>
                   <p className="text-xs text-muted-foreground mb-4 max-w-[220px]">Um Historienpunkte aufzubauen, erfasse Protokolle bei Kunden oder Verträgen.</p>
-                  <Button variant="outline" size="sm" className="bg-white/5 hover:bg-white/10 hover:text-white border-white/10 text-xs" onClick={() => navigate('/customers')}>Aktivität protokollieren</Button>
+                  <Button variant="outline" size="sm" className="bg-white/5 hover:bg-white/10 hover:text-white border-white/10 text-xs" onClick={() => navigate(createPageUrl('Customers'))}>Aktivität protokollieren</Button>
                 </div>
               ) : (
                 visibleActivities.map((act, i) => (
@@ -259,7 +259,7 @@ export default function Dashboard() {
                 <div className="flex-1 flex flex-col items-center justify-center text-center py-4">
                   <p className="text-sm font-bold text-foreground mb-2">Alles erledigt!</p>
                   <p className="text-xs text-muted-foreground mb-4 max-w-[220px]">Du hast aktuell keine offenen Aufgaben oder Fristen.</p>
-                  <Button variant="outline" size="sm" className="bg-white/5 hover:bg-white/10 hover:text-white border-white/10 text-xs" onClick={() => navigate('/tasks')}>Zur Aufgaben-Übersicht</Button>
+                  <Button variant="outline" size="sm" className="bg-white/5 hover:bg-white/10 hover:text-white border-white/10 text-xs" onClick={() => navigate(createPageUrl('Tasks'))}>Zur Aufgaben-Übersicht</Button>
                 </div>
               ) : (
                 visibleTasks.map((t, i) => (
@@ -288,7 +288,7 @@ export default function Dashboard() {
             </div>
             {combinedTasks.length > 0 && (
               <div className="mt-3 pt-3 border-t border-border/50 text-center">
-                <Button variant="link" className="text-xs md:text-sm font-semibold text-muted-foreground hover:text-primary p-0 h-auto no-underline hover:no-underline flex items-center justify-center w-full gap-2" onClick={() => navigate('/tasks')}>
+                <Button variant="link" className="text-xs md:text-sm font-semibold text-muted-foreground hover:text-primary p-0 h-auto no-underline hover:no-underline flex items-center justify-center w-full gap-2" onClick={() => navigate(createPageUrl('Tasks'))}>
                   Alle Aufgaben anzeigen <ArrowRight className="h-4 w-4" />
                 </Button>
               </div>
@@ -362,7 +362,7 @@ export default function Dashboard() {
               <Button
                 variant="link"
                 className="w-full text-xs md:text-sm hover:text-primary h-9 md:h-10 font-bold transition-colors no-underline hover:no-underline flex items-center justify-center gap-2"
-                onClick={() => navigate('/vvl')}
+                onClick={() => navigate(createPageUrl('VVL'))}
               >
                 Alle VVL-Chancen anzeigen <ArrowRight className="h-4 w-4" />
               </Button>

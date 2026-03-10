@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
+import { ROUTES, createPageUrl } from "@/utils";
 import {
   FileText,
   Users,
@@ -103,22 +104,22 @@ export default function CommandPalette({ open, onOpenChange }) {
                   <PlusCircle className="mr-2 h-4 w-4" />
                   <span>Neuer Kunde anlegen</span>
                 </CommandItem>
-                <CommandItem onSelect={() => handleSelect(() => navigate('/customers'))}>
+                <CommandItem onSelect={() => handleSelect(() => navigate(createPageUrl('Customers')))}>
                   <Users className="mr-2 h-4 w-4" />
                   <span>Kundenübersicht öffnen</span>
                 </CommandItem>
-                <CommandItem onSelect={() => handleSelect(() => navigate('/contracts'))}>
+                <CommandItem onSelect={() => handleSelect(() => navigate(createPageUrl('Contracts')))}>
                   <FileText className="mr-2 h-4 w-4" />
                   <span>Vertragsübersicht öffnen</span>
                 </CommandItem>
               </CommandGroup>
               <CommandSeparator />
               <CommandGroup heading="Navigation">
-                <CommandItem onSelect={() => handleSelect(() => navigate('/'))}>
+                <CommandItem onSelect={() => handleSelect(() => navigate(createPageUrl('Dashboard')))}>
                   <LayoutDashboard className="mr-2 h-4 w-4" />
                   <span>Dashboard</span>
                 </CommandItem>
-                <CommandItem onSelect={() => handleSelect(() => navigate('/settings'))}>
+                <CommandItem onSelect={() => handleSelect(() => navigate(createPageUrl('Settings')))}>
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Einstellungen</span>
                 </CommandItem>
@@ -145,7 +146,7 @@ export default function CommandPalette({ open, onOpenChange }) {
                     <CommandItem
                       key={c.id}
                       value={`customer-${c.id}`}
-                      onSelect={() => handleSelect(() => navigate(`/customers/${c.id}`))}
+                      onSelect={() => handleSelect(() => navigate(`${ROUTES.Customers}/${c.id}`))}
                       className="flex items-center gap-3 py-2"
                     >
                       <div className="h-8 w-8 rounded bg-primary/20 flex items-center justify-center text-primary font-bold text-xs">
@@ -166,7 +167,7 @@ export default function CommandPalette({ open, onOpenChange }) {
                     <CommandItem
                       key={c.id}
                       value={`contract-${c.id}`}
-                      onSelect={() => handleSelect(() => navigate(`/contracts/${c.id}`))}
+                      onSelect={() => handleSelect(() => navigate(`${ROUTES.Contracts}/${c.id}`))}
                       className="flex items-center gap-3 py-2"
                     >
                       <div className="h-8 w-8 rounded bg-emerald-500/20 flex items-center justify-center text-emerald-500">
@@ -190,7 +191,7 @@ export default function CommandPalette({ open, onOpenChange }) {
         open={showQuickCreate}
         onOpenChange={setShowQuickCreate}
         onSuccess={(customer) => {
-          navigate(`/customers/${customer.id}`);
+          navigate(`${ROUTES.Customers}/${customer.id}`);
           onOpenChange(false);
         }}
       />

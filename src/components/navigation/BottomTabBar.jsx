@@ -2,7 +2,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Users, AlertCircle, FileText, MoreHorizontal } from 'lucide-react';
 import { TabBarItem } from './TabBarItem';
 import { cn } from '@/lib/utils';
-import { createPageUrl } from '@/utils';
+import { ROUTES, createPageUrl } from '@/utils';
 
 /**
  * Bottom Tab Bar Navigation for Mobile
@@ -55,10 +55,10 @@ export default function BottomTabBar() {
     const getActiveTab = () => {
         const path = location.pathname;
 
-        if (path.includes('/customers') || path.includes('/customer-detail')) return 'customers';
-        if (path.includes('/vvl')) return 'vvl';
-        if (path.includes('/contracts') || path.includes('/contract-detail')) return 'contracts';
-        if (path.includes('/settings') || path.includes('/tasks') || path.includes('/backup')) return 'more';
+        if (path.includes(ROUTES.Customers)) return 'customers';
+        if (path.includes(ROUTES.VVL)) return 'vvl';
+        if (path.includes(ROUTES.Contracts)) return 'contracts';
+        if (path.includes(ROUTES.Settings) || path.includes(ROUTES.Tasks) || path.includes(ROUTES.Backup)) return 'more';
         return 'dashboard'; // Default
     };
 
