@@ -14,12 +14,13 @@ import { de } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { getContractPriority, getPriorityColor } from "@/components/utils/contractPriority";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/lib/AuthContext";
 import { createPageUrl } from "@/utils";
 import VvlWizard from "@/components/contracts/VvlWizard";
 import HistoryPreview from "@/components/history/HistoryPreview";
 import QuickAddModal from "@/components/history/QuickAddModal";
 import CancellationModal from "@/components/contracts/CancellationModal";
-import { logContractCreated, logContractUpdated, logVvlStarted, logVvlCompleted } from "@/components/utils/historyLogger";
+import { logContractCreated, logContractUpdated, logVvlStarted, logVvlCompleted, logCustomerEvent } from "@/components/utils/historyLogger";
 import ContractFormFields from "@/components/contracts/ContractFormFields";
 import ContractDocuments from "@/components/contracts/ContractDocuments";
 import { generateContractPDF, getContractFileName } from "@/components/pdf/contractPdf";
@@ -30,6 +31,7 @@ import { useIsMobile } from "@/lib/hooks/useMediaQuery";
 import { getContractStatusTransitionIssues, validateContractData } from "@/lib/validators";
 import { CONTRACT_STATUS, CONTRACT_STATUS_OPTIONS } from "@/lib/statusEnums";
 import { motion } from "framer-motion";
+import { VVL_STAGE_MACHINE, buildWorkflowTask, createTaskIfMissing, getReminderPriority, historyChangeNote } from "@/lib/processStateMachine";
 
 const pageVariants = {
   hidden: { opacity: 0, y: 10 },
@@ -41,6 +43,7 @@ const DEFAULT_NOTICE_PERIOD_DAYS = 30;
 export default function ContractDetail() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const isMobile = useIsMobile();
   const urlParams = new URLSearchParams(window.location.search);
   const contractId = urlParams.get('id');
@@ -121,6 +124,11 @@ export default function ContractDetail() {
       return allFollowups.filter(f => f.contract_id === contractId);
     },
     enabled: !!contractId && !isNew
+  });
+
+  const { data: tasks = [] } = useQuery({
+    queryKey: ['tasks'],
+    queryFn: () => base44.entities.Task.list()
   });
 
   const { data: activities = [] } = useQuery({
@@ -282,7 +290,8 @@ export default function ContractDetail() {
         customer ? (customer.customer_type === "geschäftlich" ? customer.company_name : `${customer.first_name} ${customer.last_name}`) : "",
         newContract.id,
         provider?.name || "",
-        data.category
+        data.category,
+        user?.name || user?.email || "System"
       );
 
       return newContract;
@@ -343,7 +352,8 @@ export default function ContractDetail() {
         data.customer_id,
         contract.customer_name,
         contractId,
-        "Vertragsdaten wurden geändert"
+        "Vertragsdaten wurden geändert",
+        user?.name || user?.email || "System"
       );
     },
     onSuccess: () => {
@@ -355,9 +365,9 @@ export default function ContractDetail() {
   const startVvlMutation = useMutation({
     mutationFn: async () => {
       await base44.entities.Contract.update(contractId, {
-        vvl_status: 'in_bearbeitung',
         vvl_started_at: format(new Date(), 'yyyy-MM-dd')
       });
+      await advanceVvlStage('in_bearbeitung', 'start_button');
 
       const existingOpenFollowup = followups.find(f => f.status === 'open');
       if (!existingOpenFollowup) {
@@ -386,7 +396,8 @@ export default function ContractDetail() {
         contract.customer_id,
         contract.customer_name,
         contractId,
-        contract.provider_name
+        contract.provider_name,
+        user?.name || user?.email || "System"
       );
     },
     onSuccess: () => {
@@ -417,7 +428,8 @@ export default function ContractDetail() {
         contract.customer_id,
         contract.customer_name,
         contractId,
-        outcome
+        outcome,
+        user?.name || user?.email || "System"
       );
 
       // Close all open followups
@@ -535,6 +547,81 @@ export default function ContractDetail() {
     setPendingDocuments(pendingDocuments.filter((_, i) => i !== index));
   };
 
+  const advanceVvlStage = async (nextStatus, source = "manual") => {
+    if (!contract) return;
+    const currentStatus = contract.vvl_status || "offen";
+
+    await base44.entities.Contract.update(contractId, {
+      vvl_status: nextStatus,
+      vvl_status_updated_at: new Date().toISOString(),
+      vvl_status_updated_by: user?.name || user?.email || "System"
+    });
+
+    await logCustomerEvent({
+      customerId: contract.customer_id,
+      customerName: contract.customer_name,
+      type: "system",
+      title: `VVL-Prozess: ${VVL_STAGE_MACHINE[currentStatus]?.label || currentStatus} → ${VVL_STAGE_MACHINE[nextStatus]?.label || nextStatus}` ,
+      notes: historyChangeNote({
+        entity: "VVL-Prozess",
+        from: VVL_STAGE_MACHINE[currentStatus]?.label || currentStatus,
+        to: VVL_STAGE_MACHINE[nextStatus]?.label || nextStatus,
+        actorName: user?.name || user?.email || "System"
+      }),
+      contractId,
+      tags: ["vvl_process", nextStatus, source],
+      priority: nextStatus === "angebot_erstellt" ? "high" : "medium"
+    });
+
+    if (nextStatus === "kunde_kontaktiert") {
+      await createTaskIfMissing({
+        base44,
+        existingTasks: tasks,
+        task: buildWorkflowTask({
+          title: "VVL-Angebot finalisieren",
+          contract,
+          workflowKey: `contract-${contractId}-vvl-kontaktiert`,
+          dueInDays: 2,
+          priority: "hoch"
+        })
+      });
+    }
+
+    if (nextStatus === "angebot_erstellt") {
+      await createTaskIfMissing({
+        base44,
+        existingTasks: tasks,
+        task: buildWorkflowTask({
+          title: "VVL-Angebot nachfassen",
+          contract,
+          workflowKey: `contract-${contractId}-vvl-angebot`,
+          dueInDays: 3,
+          priority: "dringend"
+        })
+      });
+    }
+
+    queryClient.invalidateQueries({ queryKey: ["contract", contractId] });
+    queryClient.invalidateQueries({ queryKey: ["contracts"] });
+    queryClient.invalidateQueries({ queryKey: ["tasks"] });
+    queryClient.invalidateQueries({ queryKey: ["customerHistory", contract.customer_id] });
+  };
+
+  const reminderBadges = [];
+  if (contract?.cancellation_deadline) {
+    reminderBadges.push({
+      type: "Kündigungsfenster",
+      ...getReminderPriority({ dueDate: contract.cancellation_deadline, kind: "Kündigungsfrist" })
+    });
+  }
+  if (contract?.end_date) {
+    reminderBadges.push({
+      type: "Vertragsende",
+      ...getReminderPriority({ dueDate: contract.end_date, kind: "Vertragsende" })
+    });
+  }
+  reminderBadges.sort((a, b) => b.score - a.score);
+
   const priority = contract && !isNew ? getContractPriority(contract, followups, new Date()) : null;
   const colors = priority ? getPriorityColor(priority.level) : null;
   const selectedCustomer = customers.find(c => c.id === formData.customer_id);
@@ -641,6 +728,16 @@ export default function ContractDetail() {
                 VVL
               </Button>
             )}
+            {VVL_STAGE_MACHINE[contract.vvl_status]?.next && (
+              <Button
+                variant="outline"
+                onClick={() => advanceVvlStage(VVL_STAGE_MACHINE[contract.vvl_status].next, "header_button")}
+                className="h-10 md:h-11 px-4 md:px-6 rounded-xl border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 font-semibold text-xs md:text-sm"
+              >
+                {VVL_STAGE_MACHINE[contract.vvl_status].actionLabel}
+              </Button>
+            )}
+
             <Button
               variant="outline"
               onClick={() => {
@@ -731,6 +828,28 @@ export default function ContractDetail() {
                 Zum Upload-Bereich
               </Button>
             </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Erinnerungen & Fristen */}
+      {!isNew && contract && reminderBadges.length > 0 && (
+        <Card className="app-form-panel p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            {reminderBadges.map((r) => (
+              <Badge
+                key={`${r.type}-${r.label}`}
+                className={cn(
+                  "border",
+                  r.level === "dringend" && "bg-rose-500/15 text-rose-400 border-rose-500/30",
+                  r.level === "hoch" && "bg-amber-500/15 text-amber-400 border-amber-500/30",
+                  r.level === "normal" && "bg-blue-500/15 text-blue-400 border-blue-500/30",
+                  r.level === "niedrig" && "bg-slate-500/15 text-slate-300 border-slate-500/30"
+                )}
+              >
+                {r.type}: {r.label}
+              </Badge>
+            ))}
           </div>
         </Card>
       )}
@@ -1094,7 +1213,7 @@ export default function ContractDetail() {
                       </div>
                       <Select onValueChange={(value) => {
                         base44.entities.Followup.update(followup.id, { status: 'done', vvl_action: value });
-                        base44.entities.Contract.update(contractId, { vvl_status: value });
+                        advanceVvlStage(value, 'followup_select');
                         base44.entities.Activity.create({
                           type: 'followup_completed',
                           customer_id: contract.customer_id,

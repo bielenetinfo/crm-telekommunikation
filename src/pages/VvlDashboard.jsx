@@ -1,15 +1,19 @@
 import { useState } from "react";
 import { base44 } from "@/api/base44Client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Filter, ArrowRight, User } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
+import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
+import { VVL_STAGE_MACHINE, buildWorkflowTask, createTaskIfMissing, getReminderPriority, historyChangeNote } from "@/lib/processStateMachine";
+import { useAuth } from "@/lib/AuthContext";
+import { logCustomerEvent } from "@/components/utils/historyLogger";
 
 const containerVariants = {
     hidden: { opacity: 0 },
@@ -26,12 +30,15 @@ const itemVariants = {
 
 export default function VvlDashboard() {
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
+    const { user } = useAuth();
     const today = new Date();
 
     const [filterProvider, setFilterProvider] = useState('all');
     const [filterStatus, setFilterStatus] = useState('all');
 
     const { data: contracts = [] } = useQuery({ queryKey: ['contracts'], queryFn: () => base44.entities.Contract.list() });
+    const { data: tasks = [] } = useQuery({ queryKey: ['tasks'], queryFn: () => base44.entities.Task.list() });
 
     // Filter Logic
     const filteredContracts = contracts.filter(c => {
@@ -53,6 +60,47 @@ export default function VvlDashboard() {
 
     const providers = [...new Set(contracts.map(c => c.provider_name).filter(Boolean))];
 
+
+    const advanceMutation = useMutation({
+        mutationFn: async ({ contract, nextStatus }) => {
+            const current = contract.vvl_status || "offen";
+            await base44.entities.Contract.update(contract.id, {
+                vvl_status: nextStatus,
+                vvl_status_updated_at: new Date().toISOString(),
+                vvl_status_updated_by: user?.name || user?.email || "System"
+            });
+
+            await logCustomerEvent({
+                customerId: contract.customer_id,
+                customerName: contract.customer_name,
+                type: "system",
+                title: `VVL Dashboard: ${VVL_STAGE_MACHINE[current]?.label || current} → ${VVL_STAGE_MACHINE[nextStatus]?.label || nextStatus}`,
+                notes: historyChangeNote({ entity: "VVL-Dashboard", from: current, to: nextStatus, actorName: user?.name || user?.email || "System" }),
+                contractId: contract.id,
+                tags: ["vvl_dashboard", nextStatus],
+                priority: "medium"
+            });
+
+            if (nextStatus === "angebot_erstellt") {
+                await createTaskIfMissing({
+                    base44,
+                    existingTasks: tasks,
+                    task: buildWorkflowTask({
+                        title: "VVL-Angebot nachfassen (Dashboard)",
+                        contract,
+                        workflowKey: `contract-${contract.id}-vvl-dashboard-angebot`,
+                        dueInDays: 2,
+                        priority: "dringend"
+                    })
+                });
+            }
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["contracts"] });
+            queryClient.invalidateQueries({ queryKey: ["tasks"] });
+            toast.success("VVL-Status aktualisiert");
+        }
+    });
     return (
         <div className="space-y-6 px-4 md:px-6 pt-3 md:pt-4 pb-24 w-full max-w-[1600px] text-foreground">
 
@@ -136,6 +184,9 @@ export default function VvlDashboard() {
                         const days = differenceInDays(new Date(c.cancellation_deadline), today);
                         const isUrgent = days <= 30;
                         const isCritical = days <= 90;
+                        const cancellationReminder = getReminderPriority({ dueDate: c.cancellation_deadline, kind: "Kündigungsfenster" });
+                        const endReminder = c.end_date ? getReminderPriority({ dueDate: c.end_date, kind: "Vertragsende" }) : null;
+                        const nextAction = VVL_STAGE_MACHINE[c.vvl_status || "offen"]?.next;
 
                         return (
                             <motion.div variants={itemVariants} key={c.id}>
@@ -180,11 +231,37 @@ export default function VvlDashboard() {
                                                 </div>
                                             </div>
 
+                                            <div className="flex flex-wrap items-center gap-2 text-[10px] font-bold uppercase tracking-wider">
+                                                <Badge className={cn("border", cancellationReminder.level === "dringend" ? "bg-rose-500/15 text-rose-400 border-rose-500/30" : "bg-amber-500/15 text-amber-400 border-amber-500/30")}>
+                                                    {cancellationReminder.label}
+                                                </Badge>
+                                                {endReminder && (
+                                                    <Badge className="bg-blue-500/15 text-blue-400 border-blue-500/30 border">
+                                                        Ende: {endReminder.label}
+                                                    </Badge>
+                                                )}
+                                            </div>
+
                                             <div className="flex items-center justify-between text-xs font-medium text-muted-foreground pt-2 border-t border-border/10">
                                                 <span className="flex items-center gap-1.5 hover:text-foreground transition-colors">
                                                     <User className="h-3.5 w-3.5" /> Profil
                                                 </span>
-                                                <ArrowRight className="h-4 w-4 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all text-primary" />
+                                                <div className="flex items-center gap-2">
+                                                    {nextAction && (
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            className="h-7 text-[10px]"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                advanceMutation.mutate({ contract: c, nextStatus: nextAction });
+                                                            }}
+                                                        >
+                                                            {VVL_STAGE_MACHINE[c.vvl_status || "offen"]?.actionLabel}
+                                                        </Button>
+                                                    )}
+                                                    <ArrowRight className="h-4 w-4 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all text-primary" />
+                                                </div>
                                             </div>
                                         </div>
                                     </div>

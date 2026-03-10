@@ -14,6 +14,7 @@ import { useIsMobile } from "@/lib/hooks/useMediaQuery";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
+import { getReminderPriority } from "@/lib/processStateMachine";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -73,6 +74,10 @@ export default function Tasks() {
       t.title?.toLowerCase().includes(search.toLowerCase()) ||
       t.customer_name?.toLowerCase().includes(search.toLowerCase());
     return matchesFilter && matchesSearch;
+  }).sort((a, b) => {
+    const aReminder = getReminderPriority({ dueDate: a.due_date, kind: "Fälligkeit" });
+    const bReminder = getReminderPriority({ dueDate: b.due_date, kind: "Fälligkeit" });
+    return bReminder.score - aReminder.score;
   });
 
   const priorityColors = {
@@ -251,6 +256,9 @@ export default function Tasks() {
                       <Badge variant="outline" className={cn("text-[9px] px-2 h-5 uppercase tracking-tighter font-black border-none mix-blend-multiply dark:mix-blend-screen", priorityColors[t.priority] || priorityColors.normal)}>
                         {t.priority}
                       </Badge>
+                      {t.source === 'workflow_automation' && (
+                        <Badge variant="outline" className="text-[9px] px-2 h-5 uppercase tracking-tighter font-black border border-primary/30 text-primary">Auto</Badge>
+                      )}
                     </div>
                     <div className="flex items-center gap-5 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
                       <span className="flex items-center gap-2">

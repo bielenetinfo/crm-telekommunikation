@@ -1,6 +1,6 @@
 import { useState, useEffect, useDeferredValue } from "react";
 import { base44 } from "@/api/base44Client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -15,6 +15,9 @@ import { KpiCard } from "@/components/ui/kpi-card";
 import { startOfMonth, endOfMonth } from "date-fns";
 import { motion } from "framer-motion";
 import CustomerDetail from "@/pages/CustomerDetail";
+import { toast } from "sonner";
+import { useAuth } from "@/lib/AuthContext";
+import { CUSTOMER_STAGE_MACHINE, buildWorkflowTask, createTaskIfMissing, historyChangeNote } from "@/lib/processStateMachine";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -31,6 +34,8 @@ const itemVariants = {
 
 export default function Customers() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
   const isMobile = useIsMobile();
   const canUseSplitDetail = useMediaQuery('(min-width: 1700px)');
   const urlParams = new URLSearchParams(window.location.search);
@@ -54,6 +59,90 @@ export default function Customers() {
   const { data: contracts = [] } = useQuery({
     queryKey: ['contracts'],
     queryFn: () => base44.entities.Contract.list()
+  });
+
+  const { data: tasks = [] } = useQuery({
+    queryKey: ['tasks'],
+    queryFn: () => base44.entities.Task.list()
+  });
+
+  const transitionCustomerStageMutation = useMutation({
+    mutationFn: async ({ customer, nextStage, activeCount }) => {
+      const currentStage = customer.sales_stage || 'lead';
+      await base44.entities.Customer.update(customer.id, {
+        sales_stage: nextStage,
+        sales_stage_updated_at: new Date().toISOString(),
+        sales_stage_updated_by: user?.name || user?.email || 'System'
+      });
+
+      await base44.entities.CustomerHistory.create({
+        customer_id: customer.id,
+        customer_name: customer.customer_type === 'geschäftlich' ? customer.company_name : `${customer.first_name} ${customer.last_name}`,
+        type: 'system',
+        title: `Lead-Prozess: ${CUSTOMER_STAGE_MACHINE[currentStage]?.label || currentStage} → ${CUSTOMER_STAGE_MACHINE[nextStage]?.label || nextStage}`,
+        notes: historyChangeNote({
+          entity: 'Kundenprozess',
+          from: CUSTOMER_STAGE_MACHINE[currentStage]?.label || currentStage,
+          to: CUSTOMER_STAGE_MACHINE[nextStage]?.label || nextStage,
+          actorName: user?.name || user?.email || 'System'
+        }),
+        channel: 'store',
+        status: 'done',
+        occurred_at: new Date().toISOString(),
+        priority: 'medium',
+        tags: JSON.stringify(['customer_process', nextStage]),
+        is_system_event: true,
+        user_name: user?.name || user?.email || 'System'
+      });
+
+      if (nextStage === 'qualifiziert') {
+        await createTaskIfMissing({
+          base44,
+          existingTasks: tasks,
+          task: buildWorkflowTask({
+            title: 'Bedarfsanalyse terminieren',
+            customer,
+            workflowKey: `customer-${customer.id}-qualifiziert`,
+            dueInDays: 2,
+            priority: 'hoch'
+          })
+        });
+      }
+
+      if (nextStage === 'angebot') {
+        await createTaskIfMissing({
+          base44,
+          existingTasks: tasks,
+          task: buildWorkflowTask({
+            title: 'Angebot versenden & nachfassen',
+            customer,
+            workflowKey: `customer-${customer.id}-angebot`,
+            dueInDays: 1,
+            priority: 'dringend'
+          })
+        });
+      }
+
+      if (nextStage === 'vertrag_aktiv' && activeCount > 0) {
+        await createTaskIfMissing({
+          base44,
+          existingTasks: tasks,
+          task: buildWorkflowTask({
+            title: 'Onboarding & Service-Reminder setzen',
+            customer,
+            workflowKey: `customer-${customer.id}-vertrag-aktiv`,
+            dueInDays: 5,
+            priority: 'normal'
+          })
+        });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['customerHistory'] });
+      toast.success('Prozessstatus aktualisiert');
+    }
   });
 
   const filteredCustomers = customers.filter(c => {
@@ -249,6 +338,8 @@ export default function Customers() {
 	                const customerContracts = contracts.filter(c => c.customer_id === customer.id);
 	                const activeCount = customerContracts.filter(c => c.status === 'aktiv').length;
 	                const hasVvl = customerContracts.some(c => c.status === 'aktiv' && c.cancellation_deadline);
+                    const stage = customer.sales_stage || 'lead';
+                    const stageConfig = CUSTOMER_STAGE_MACHINE[stage] || CUSTOMER_STAGE_MACHINE.lead;
                     const isSelected = showSplitDetail && selectedCustomerId === customer.id;
 	
 	                return (
@@ -319,6 +410,12 @@ export default function Customers() {
                                   <Badge className="bg-rose-500/10 text-rose-500 border-none text-[9px] uppercase tracking-widest font-black">VVL-Fenster</Badge>
                                 </>
                               )}
+                              <>
+                                <span className="h-1 w-1 rounded-full bg-border" />
+                                <Badge className="bg-primary/10 text-primary border-none text-[9px] uppercase tracking-widest font-black">
+                                  {stageConfig.label}
+                                </Badge>
+                              </>
                             </div>
                           </div>
                         </div>
@@ -336,6 +433,24 @@ export default function Customers() {
                             <Plus className={cn("h-3.5 w-3.5", !isDetailOpen && "mr-1.5")} />
                             {!isDetailOpen && "Vertrag"}
                           </Button>
+                          {stageConfig.next && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const validationError = stageConfig.validation({ activeContracts: activeCount });
+                                if (validationError) {
+                                  toast.error(validationError);
+                                  return;
+                                }
+                                transitionCustomerStageMutation.mutate({ customer, nextStage: stageConfig.next, activeCount });
+                              }}
+                              className="hidden lg:flex text-[10px] uppercase tracking-widest font-black h-9 px-3 rounded-xl"
+                            >
+                              {stageConfig.actionLabel}
+                            </Button>
+                          )}
                           <button
                             type="button"
                             onClick={() => openCustomerDetail(customer)}
