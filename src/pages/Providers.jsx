@@ -24,6 +24,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { motion } from "framer-motion";
+import { canAccessAction, ACTION_PERMISSIONS } from '@/lib/security';
+import { useAuth } from '@/lib/AuthContext';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -51,6 +53,7 @@ const PROVIDER_CATEGORIES = [
 export default function Providers() {
   const isMobile = useIsMobile();
   const { toast } = useToast();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   // Dialog State
@@ -190,6 +193,10 @@ export default function Providers() {
   };
 
   const confirmDelete = () => {
+    if (!canAccessAction(user, ACTION_PERMISSIONS.delete)) {
+      toast({ title: 'Fehler', description: 'Keine Berechtigung zum Löschen.', variant: 'destructive' });
+      return;
+    }
     if (deleteDialogOpen) {
       deleteProviderMutation.mutate(deleteDialogOpen.id);
     }
@@ -233,6 +240,7 @@ export default function Providers() {
         {!isMobile && (
           <Button
             onClick={openCreateDialog}
+            disabled={!canAccessAction(user, ACTION_PERMISSIONS.delete)}
             className="btn-premium bg-primary text-primary-foreground hover:bg-primary/90 font-bold px-6 h-12 shadow-lg shadow-primary/20 text-sm rounded-xl"
           >
             <Plus className="h-4 w-4 mr-2" />

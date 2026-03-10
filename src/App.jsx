@@ -2,7 +2,6 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import Layout from '@/Layout';
 import Dashboard from '@/pages/Dashboard';
 import Customers from '@/pages/Customers';
-import CustomerDetail from '@/pages/CustomerDetail';
 import Contracts from '@/pages/Contracts';
 import ContractDetail from '@/pages/ContractDetail';
 import VvlDashboard from '@/pages/VvlDashboard';
@@ -21,32 +20,38 @@ import LoginPage from '@/pages/LoginPage';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import { ThemeProvider } from '@/lib/ThemeContext';
 import { Toaster } from '@/components/ui/sonner';
+import { canAccessRoute } from '@/lib/security';
 
-// Private Route Wrapper
+const FullScreenLoader = () => (
+  <div className="flex h-screen items-center justify-center bg-[#0F1115] text-[#FFD24D]">
+    <div className="flex flex-col items-center gap-4">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#FFD24D]" />
+      <p className="font-medium">System wird geladen...</p>
+    </div>
+  </div>
+);
+
+// Private Route Wrapper + route guard
 const PrivateRoute = ({ children }) => {
-  const { isAuthenticated, isLoadingAuth } = useAuth();
+  const { isAuthenticated, isLoadingAuth, user } = useAuth();
   const location = useLocation();
 
   if (isLoadingAuth) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-[#0F1115] text-[#FFD24D]">
-        <div className="flex flex-col items-center gap-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#FFD24D]"></div>
-          <p className="font-medium">System wird geladen...</p>
-        </div>
-      </div>
-    );
+    return <FullScreenLoader />;
   }
 
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
+  if (!canAccessRoute(user, location.pathname)) {
+    return <Navigate to="/" replace />;
+  }
+
   return children;
 };
 
 const App = () => {
-  console.log('[App.jsx] Rendering App Component');
   return (
     <AuthProvider>
       <ThemeProvider>

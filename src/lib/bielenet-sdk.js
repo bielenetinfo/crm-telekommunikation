@@ -14,7 +14,12 @@ import {
     getEncryptionKey,
     recordFailedLogin,
     clearLoginAttempts,
-    isLoginLocked
+    isLoginLocked,
+    assertPermission,
+    ACTION_PERMISSIONS,
+    appendAuditLog,
+    ROLES,
+    normalizeRole
 } from './security.js';
 import { validateCustomerData, validateContractData, validatePassword } from './validators.js';
 
@@ -23,6 +28,17 @@ const DB_KEY = 'bielenet_db';
 const AUTH_KEY = 'bielenet_auth';
 const DB_VERSION_KEY = 'bielenet_db_version';
 const DB_VERSION = '2';
+
+const getActiveSessionUser = () => {
+    const sessionStr = localStorage.getItem(AUTH_KEY);
+    if (!sessionStr) return null;
+    const session = JSON.parse(sessionStr);
+    if (!session?.userId || !isSessionValid(session)) return null;
+    const db = getDb();
+    const user = db.users.find(u => u.id === session.userId);
+    if (!user) return null;
+    return { ...user, role: normalizeRole(user.role) };
+};
 
 // Helper to hash password on first use (migration from plaintext)
 const hashPasswordIfNeeded = async (password) => {
@@ -135,6 +151,11 @@ const saveDb = (db) => {
 // --- AUTH MODULE ---
 const auth = {
     createUser: async (email, password, role = "user", fullName = "") => {
+        const currentUser = getActiveSessionUser();
+        if (currentUser) {
+            assertPermission(currentUser, ACTION_PERMISSIONS.userManagement, 'Keine Berechtigung für Benutzerverwaltung');
+            assertPermission(currentUser, ACTION_PERMISSIONS.roleChange, 'Keine Berechtigung für Rollenänderungen');
+        }
         if (!validatePassword(password)) {
             throw new Error("Passwort-Policy verletzt: min 8 Zeichen, 1 Zahl, 1 Sonderzeichen");
         }
@@ -143,9 +164,18 @@ const auth = {
             throw new Error("User existiert bereits");
         }
         const hashed = await bcrypt.hash(password, 10);
-        const newUser = { id: crypto.randomUUID(), email, password: hashed, role, name: fullName || email, twoFactorSecret: null };
+        const newUser = { id: crypto.randomUUID(), email, password: hashed, role: normalizeRole(role), name: fullName || email, twoFactorSecret: null };
         db.users.push(newUser);
         saveDb(db);
+        if (currentUser) {
+            appendAuditLog({
+                type: 'user_created',
+                actorId: currentUser.id,
+                actorRole: currentUser.role,
+                targetId: newUser.id,
+                details: `Benutzer ${email} mit Rolle ${newUser.role} erstellt`
+            });
+        }
         return { id: newUser.id, email: newUser.email, role: newUser.role, name: newUser.name };
     },
     me: async () => {
@@ -167,7 +197,7 @@ const auth = {
             id: user.id,
             email: user.email,
             name: user.name,
-            role: user.role,
+            role: normalizeRole(user.role),
             is2FAEnabled: !!user.twoFactorSecret
         };
     },
@@ -385,14 +415,48 @@ const createEntityHandler = (collection) => ({
         const idx = db[collection]?.findIndex(i => i.id === id);
         if (idx === -1) throw new Error('Not found');
 
+        const currentUser = getActiveSessionUser();
+        const previous = db[collection][idx];
+
+        if (collection === 'users' && data.role && data.role !== previous.role) {
+            assertPermission(currentUser, ACTION_PERMISSIONS.roleChange, 'Keine Berechtigung für Rollenänderungen');
+            appendAuditLog({
+                type: 'role_changed',
+                actorId: currentUser?.id,
+                actorRole: currentUser?.role,
+                targetId: id,
+                details: `Rolle geändert von ${previous.role} auf ${data.role}`
+            });
+        }
+
+        if (collection === 'contracts' && data.status && data.status !== previous.status) {
+            assertPermission(currentUser, ACTION_PERMISSIONS.contractStatusChange, 'Keine Berechtigung für Vertragsstatusänderungen');
+            appendAuditLog({
+                type: 'contract_status_changed',
+                actorId: currentUser?.id,
+                actorRole: currentUser?.role,
+                targetId: id,
+                details: `Vertragsstatus geändert von ${previous.status} auf ${data.status}`
+            });
+        }
+
         db[collection][idx] = { ...db[collection][idx], ...data };
         saveDb(db);
         return db[collection][idx];
     },
     delete: async (id) => {
+        const currentUser = getActiveSessionUser();
+        assertPermission(currentUser, ACTION_PERMISSIONS.delete, 'Keine Berechtigung zum Löschen');
         const db = getDb();
         db[collection] = db[collection].filter(i => i.id !== id);
         saveDb(db);
+        appendAuditLog({
+            type: 'record_deleted',
+            actorId: currentUser?.id,
+            actorRole: currentUser?.role,
+            targetId: id,
+            details: `${collection}:${id} gelöscht`
+        });
     }
 });
 
@@ -1189,7 +1253,20 @@ const createContractHandler = () => ({
         const idx = db.contracts?.findIndex(i => i.id === id);
         if (idx === -1) throw new Error('Not found');
 
-        const updatedData = { ...db.contracts[idx], ...data, updated_at: new Date().toISOString() };
+        const currentUser = getActiveSessionUser();
+        const currentContract = db.contracts[idx];
+        if (data.status && data.status !== currentContract.status) {
+            assertPermission(currentUser, ACTION_PERMISSIONS.contractStatusChange, 'Keine Berechtigung für Vertragsstatusänderungen');
+            appendAuditLog({
+                type: 'contract_status_changed',
+                actorId: currentUser?.id,
+                actorRole: currentUser?.role,
+                targetId: id,
+                details: `Vertragsstatus geändert von ${currentContract.status} auf ${data.status}`
+            });
+        }
+
+        const updatedData = { ...currentContract, ...data, updated_at: new Date().toISOString() };
 
         // Recalculate deadline and priority if relevant fields changed
         if (data.end_date || data.cancellation_period_months || data.notice_period_days) {
@@ -1202,9 +1279,18 @@ const createContractHandler = () => ({
         return db.contracts[idx];
     },
     delete: async (id) => {
+        const currentUser = getActiveSessionUser();
+        assertPermission(currentUser, ACTION_PERMISSIONS.delete, 'Keine Berechtigung zum Löschen');
         const db = getDb();
         db.contracts = db.contracts.filter(i => i.id !== id);
         saveDb(db);
+        appendAuditLog({
+            type: 'record_deleted',
+            actorId: currentUser?.id,
+            actorRole: currentUser?.role,
+            targetId: id,
+            details: `contracts:${id} gelöscht`
+        });
     }
 });
 

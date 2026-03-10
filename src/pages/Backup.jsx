@@ -5,13 +5,20 @@ import { Download, Upload, AlertCircle, CheckCircle2, History, RotateCcw, Save }
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
+import { useAuth } from "@/lib/AuthContext";
+import { canAccessAction, ACTION_PERMISSIONS, appendAuditLog } from "@/lib/security";
 import { de } from "date-fns/locale";
 
 export default function Backup() {
+  const { user } = useAuth();
   const [isExporting, setIsExporting] = useState(false);
   const [lastBackup, setLastBackup] = useState(new Date().toISOString());
 
   const handleExport = () => {
+    if (!canAccessAction(user, ACTION_PERMISSIONS.export)) {
+      toast.error('Keine Berechtigung für Export.');
+      return;
+    }
     setIsExporting(true);
     try {
       const db = localStorage.getItem('bielenet_db');
@@ -25,6 +32,12 @@ export default function Backup() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       setLastBackup(new Date().toISOString());
+      appendAuditLog({
+        type: 'data_exported',
+        actorId: user?.id,
+        actorRole: user?.role,
+        details: 'Backup exportiert'
+      });
       toast.success("Backup erfolgreich erstellt und heruntergeladen.");
     } catch (e) {
       toast.error("Backup-Fehler: " + e.message);
@@ -96,7 +109,7 @@ export default function Backup() {
 
             <Button
               onClick={handleExport}
-              disabled={isExporting}
+              disabled={isExporting || !canAccessAction(user, ACTION_PERMISSIONS.export)}
               className="w-full btn-premium bg-primary text-primary-foreground hover:bg-primary/90 font-bold h-14 rounded-2xl shadow-lg shadow-primary/20 text-sm uppercase tracking-wider transition-all hover:scale-[1.02]"
             >
               <Save className="h-5 w-5 mr-2" />
