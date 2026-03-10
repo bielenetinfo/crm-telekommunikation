@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,6 +28,10 @@ import { FloatingActionButton } from "@/components/ui/floating-action-button";
 import { useIsMobile } from "@/lib/hooks/useMediaQuery";
 import { validateContractData } from "@/lib/validators";
 import { motion } from "framer-motion";
+import { contractService } from "@/domain/contract/service";
+import { customerService } from "@/domain/customer/service";
+import { mapContractFormToPayload } from "@/domain/contract/mappers/contractMappers";
+import { toApiError } from "@/domain/common/errors";
 
 const pageVariants = {
   hidden: { opacity: 0, y: 10 },
@@ -91,32 +94,30 @@ export default function ContractDetail() {
   const { data: contract } = useQuery({
     queryKey: ['contract', contractId],
     queryFn: async () => {
-      const contracts = await base44.entities.Contract.list();
-      return contracts.find(c => c.id === contractId);
+      return contractService.getById(contractId);
     },
     enabled: !!contractId && !isNew
   });
 
   const { data: customers = [] } = useQuery({
     queryKey: ['customers'],
-    queryFn: () => base44.entities.Customer.list()
+    queryFn: () => customerService.list()
   });
 
   const { data: providers = [] } = useQuery({
     queryKey: ['providers'],
-    queryFn: () => base44.entities.Provider.list()
+    queryFn: () => contractService.listProviders()
   });
 
   const { data: branches = [] } = useQuery({
     queryKey: ['branches'],
-    queryFn: () => base44.entities.Branch.list()
+    queryFn: () => contractService.listBranches()
   });
 
   const { data: followups = [] } = useQuery({
     queryKey: ['followups', contractId],
     queryFn: async () => {
-      const allFollowups = await base44.entities.Followup.list();
-      return allFollowups.filter(f => f.contract_id === contractId);
+      return contractService.getFollowups(contractId);
     },
     enabled: !!contractId && !isNew
   });
@@ -124,8 +125,7 @@ export default function ContractDetail() {
   const { data: activities = [] } = useQuery({
     queryKey: ['activities', contractId],
     queryFn: async () => {
-      const allActivities = await base44.entities.Activity.list('-created_date', 50);
-      return allActivities.filter(a => a.contract_id === contractId);
+      return contractService.getActivities(contractId);
     },
     enabled: !!contractId && !isNew
   });
@@ -133,8 +133,7 @@ export default function ContractDetail() {
   const { data: customerHistory = [] } = useQuery({
     queryKey: ['customerHistory', contract?.customer_id],
     queryFn: async () => {
-      const allHistory = await base44.entities.CustomerHistory.list('-occurred_at', 200);
-      return allHistory.filter(h => h.customer_id === contract.customer_id);
+      return contractService.getCustomerHistory(contract.customer_id);
     },
     enabled: !!contract?.customer_id && !isNew
   });
@@ -144,8 +143,7 @@ export default function ContractDetail() {
     const fetchLastVvl = async () => {
       if (contract?.last_vvl_id) {
         try {
-          const vvlRecords = await base44.entities.VvlRecord.list('-created_date', 1);
-          const record = vvlRecords.find(r => r.id === contract.last_vvl_id);
+          const record = await contractService.getVvlRecordById(contract.last_vvl_id);
           setLastVvlRecord(record || null);
         } catch (error) {
           console.error('Failed to fetch VVL record:', error);
@@ -232,40 +230,10 @@ export default function ContractDetail() {
       const customer = customers.find(c => c.id === data.customer_id);
       const provider = providers.find(p => p.id === data.provider_id);
 
-      const newContract = await base44.entities.Contract.create({
-        customer_id: data.customer_id,
-        customer_name: customer ? (customer.customer_type === "geschäftlich" ? customer.company_name : `${customer.first_name} ${customer.last_name}`) : "",
-        provider_id: data.provider_id,
-        provider_name: provider?.name || "",
-        category: data.category,
-        start_date: data.start_date,
-        end_date: calculatedData.end_date,
-        cancellation_deadline: calculatedData.cancellation_deadline,
-        contract_duration_months: data.contract_duration_months,
-        notice_period_days: data.notice_period_days,
-        monthly_fee: data.monthly_fee ? parseFloat(data.monthly_fee) : null,
-        commission: data.commission ? parseFloat(data.commission) : null,
-        status: data.status,
-        vvl_status: data.vvl_status,
-        notes: data.notes,
-        tariff_name: data.tariff_name || "",
-        tariff_details: data.tariff_details || "",
-        contract_number: data.contract_number || "",
-        mobilfunk_type: data.mobilfunk_type || "",
-        data_volume_gb: data.data_volume_gb ? parseFloat(data.data_volume_gb) : null,
-        has_allnet_flat: data.has_allnet_flat || false,
-        has_sms_flat: data.has_sms_flat || false,
-        has_roaming: data.has_roaming || false,
-        connection_type: data.connection_type || "",
-        speed_download_mbit: data.speed_download_mbit ? parseFloat(data.speed_download_mbit) : null,
-        speed_upload_mbit: data.speed_upload_mbit ? parseFloat(data.speed_upload_mbit) : null,
-        router_included: data.router_included || false,
-        router_model: data.router_model || "",
-        tv_option: data.tv_option || "",
-        contract_documents: JSON.stringify(pendingDocuments)
-      });
+      const payload = mapContractFormToPayload({ data, customer, provider, calculatedData, pendingDocuments });
+      const newContract = await contractService.create(payload);
 
-      await base44.entities.Activity.create({
+      await contractService.createActivity({
         type: 'contract_created',
         customer_id: data.customer_id,
         customer_name: customer ? (customer.customer_type === "geschäftlich" ? customer.company_name : `${customer.first_name} ${customer.last_name}`) : "",
@@ -295,39 +263,10 @@ export default function ContractDetail() {
       const customer = customers.find(c => c.id === data.customer_id);
       const provider = providers.find(p => p.id === data.provider_id);
 
-      await base44.entities.Contract.update(contractId, {
-        customer_id: data.customer_id,
-        customer_name: customer ? (customer.customer_type === "geschäftlich" ? customer.company_name : `${customer.first_name} ${customer.last_name}`) : "",
-        provider_id: data.provider_id,
-        provider_name: provider?.name || "",
-        category: data.category,
-        start_date: data.start_date,
-        end_date: calculatedData.end_date || data.end_date,
-        cancellation_deadline: calculatedData.cancellation_deadline || data.cancellation_deadline,
-        contract_duration_months: data.contract_duration_months,
-        notice_period_days: data.notice_period_days,
-        monthly_fee: data.monthly_fee ? parseFloat(data.monthly_fee) : null,
-        commission: data.commission ? parseFloat(data.commission) : null,
-        status: data.status,
-        vvl_status: data.vvl_status,
-        notes: data.notes,
-        tariff_name: data.tariff_name || "",
-        tariff_details: data.tariff_details || "",
-        contract_number: data.contract_number || "",
-        mobilfunk_type: data.mobilfunk_type || "",
-        data_volume_gb: data.data_volume_gb ? parseFloat(data.data_volume_gb) : null,
-        has_allnet_flat: data.has_allnet_flat || false,
-        has_sms_flat: data.has_sms_flat || false,
-        has_roaming: data.has_roaming || false,
-        connection_type: data.connection_type || "",
-        speed_download_mbit: data.speed_download_mbit ? parseFloat(data.speed_download_mbit) : null,
-        speed_upload_mbit: data.speed_upload_mbit ? parseFloat(data.speed_upload_mbit) : null,
-        router_included: data.router_included || false,
-        router_model: data.router_model || "",
-        tv_option: data.tv_option || ""
-      });
+      const payload = mapContractFormToPayload({ data, customer, provider, calculatedData });
+      await contractService.update(contractId, payload);
 
-      await base44.entities.Activity.create({
+      await contractService.createActivity({
         type: 'contract_updated',
         customer_id: data.customer_id,
         customer_name: contract.customer_name,
@@ -335,7 +274,6 @@ export default function ContractDetail() {
         short_text: `Vertrag aktualisiert`
       });
 
-      // Log to customer history
       await logContractUpdated(
         data.customer_id,
         contract.customer_name,
@@ -351,14 +289,14 @@ export default function ContractDetail() {
 
   const startVvlMutation = useMutation({
     mutationFn: async () => {
-      await base44.entities.Contract.update(contractId, {
+      await contractService.update(contractId, {
         vvl_status: 'in_bearbeitung',
         vvl_started_at: format(new Date(), 'yyyy-MM-dd')
       });
 
       const existingOpenFollowup = followups.find(f => f.status === 'open');
       if (!existingOpenFollowup) {
-        await base44.entities.Followup.create({
+        await contractService.createFollowup({
           contract_id: contractId,
           customer_id: contract.customer_id,
           customer_name: contract.customer_name,
@@ -370,7 +308,7 @@ export default function ContractDetail() {
         });
       }
 
-      await base44.entities.Activity.create({
+      await contractService.createActivity({
         type: 'vvl_started',
         customer_id: contract.customer_id,
         customer_name: contract.customer_name,
@@ -378,7 +316,6 @@ export default function ContractDetail() {
         short_text: `VVL gestartet`
       });
 
-      // Log to customer history
       await logVvlStarted(
         contract.customer_id,
         contract.customer_name,
@@ -396,12 +333,12 @@ export default function ContractDetail() {
 
   const completeVvlMutation = useMutation({
     mutationFn: async ({ outcome, notes }) => {
-      await base44.entities.Contract.update(contractId, {
+      await contractService.update(contractId, {
         vvl_status: outcome,
         status: outcome === 'verlängert' ? 'verlängert' : contract.status
       });
 
-      await base44.entities.Activity.create({
+      await contractService.createActivity({
         type: 'followup_completed',
         customer_id: contract.customer_id,
         customer_name: contract.customer_name,
@@ -409,7 +346,6 @@ export default function ContractDetail() {
         short_text: `VVL abgeschlossen: ${outcome}${notes ? ' • ' + notes : ''}`
       });
 
-      // Log to customer history
       await logVvlCompleted(
         contract.customer_id,
         contract.customer_name,
@@ -417,10 +353,9 @@ export default function ContractDetail() {
         outcome
       );
 
-      // Close all open followups
       const openFollowups = followups.filter(f => f.status === 'open');
       for (const f of openFollowups) {
-        await base44.entities.Followup.update(f.id, { status: 'done', vvl_action: outcome });
+        await contractService.updateFollowup(f.id, { status: 'done', vvl_action: outcome });
       }
     },
     onSuccess: () => {
@@ -475,7 +410,7 @@ export default function ContractDetail() {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const validationErrors = validateContractForm();
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
@@ -485,10 +420,15 @@ export default function ContractDetail() {
     }
     setErrors({});
 
-    if (isNew) {
-      createMutation.mutate(formData);
-    } else {
-      updateMutation.mutate(formData);
+    try {
+      if (isNew) {
+        await createMutation.mutateAsync(formData);
+      } else {
+        await updateMutation.mutateAsync(formData);
+      }
+    } catch (error) {
+      const apiError = toApiError(error, "Speichern fehlgeschlagen");
+      toast.error(apiError.message);
     }
   };
 
@@ -498,7 +438,7 @@ export default function ContractDetail() {
 
     setUploadingContract(true);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const { file_url } = await contractService.uploadFile(file);
 
       const newDoc = {
         url: file_url,
@@ -531,7 +471,7 @@ export default function ContractDetail() {
         ? customer.company_name
         : `${customer.first_name} ${customer.last_name}`;
 
-      return base44.entities.CustomerHistory.create({
+      return contractService.createCustomerHistory({
         customer_id: contract.customer_id,
         customer_name: customerName,
         type: data.type,
@@ -555,7 +495,7 @@ export default function ContractDetail() {
   const deleteContractMutation = useMutation({
     mutationFn: async () => {
       // Log deletion to history first
-      await base44.entities.CustomerHistory.create({
+      await contractService.createCustomerHistory({
         customer_id: contract.customer_id,
         customer_name: contract.customer_name,
         type: 'system',
@@ -570,7 +510,7 @@ export default function ContractDetail() {
         is_system_event: true
       });
 
-      await base44.entities.Contract.update(contractId, {
+      await contractService.update(contractId, {
         is_deleted: true,
         deleted_at: new Date().toISOString(),
         status: 'abgelaufen'
@@ -1059,9 +999,9 @@ export default function ContractDetail() {
                         </p>
                       </div>
                       <Select onValueChange={(value) => {
-                        base44.entities.Followup.update(followup.id, { status: 'done', vvl_action: value });
-                        base44.entities.Contract.update(contractId, { vvl_status: value });
-                        base44.entities.Activity.create({
+                        contractService.updateFollowup(followup.id, { status: 'done', vvl_action: value });
+                        contractService.update(contractId, { vvl_status: value });
+                        contractService.createActivity({
                           type: 'followup_completed',
                           customer_id: contract.customer_id,
                           customer_name: contract.customer_name,
