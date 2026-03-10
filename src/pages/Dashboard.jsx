@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { base44 } from "@/api/base44Client";
-import { Users, FileText, CheckCircle2, ArrowRight, Clock, TrendingUp, Sparkles, UserPlus } from "lucide-react";
+import { Users, FileText, CheckCircle2, ArrowRight, Clock, TrendingUp, Sparkles, UserPlus, ShieldCheck, AlertCircle } from "lucide-react";
 import { format, differenceInDays, startOfMonth, endOfMonth } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -13,6 +13,8 @@ import CommandPalette from "@/components/search/CommandPalette";
 import { FloatingActionButton } from "@/components/ui/floating-action-button";
 import { useIsMobile } from "@/lib/hooks/useMediaQuery";
 import { motion } from "framer-motion";
+import { CONTRACT_STATUS, CUSTOMER_LIFECYCLE_PHASES } from "@/lib/statusEnums";
+import { getCustomerLifecycleChecklist } from "@/lib/validators";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -44,7 +46,7 @@ export default function Dashboard() {
   const { data: activities = [] } = useQuery({ queryKey: ['activities'], queryFn: () => base44.entities.Activity.list('-timestamp', 5) });
 
   // Stats
-  const activeContracts = contracts.filter(c => c.status === 'aktiv');
+  const activeContracts = contracts.filter(c => c.status === CONTRACT_STATUS.ACTIVE);
   const monthStart = startOfMonth(today);
   const monthEnd = endOfMonth(today);
 
@@ -75,6 +77,15 @@ export default function Dashboard() {
     return dateA - dateB;
   });
 
+
+
+  const incompleteCustomerProfiles = customers.filter((customer) => {
+    const checklist = getCustomerLifecycleChecklist(customer, customer.lifecycle_phase || CUSTOMER_LIFECYCLE_PHASES.LEAD);
+    return checklist.some(item => !item.complete);
+  });
+  const customersWithMissingDsgvo = customers.filter(c => !c.dsgvo_document_url);
+  const incompleteCustomerRatio = customers.length ? Math.round((incompleteCustomerProfiles.length / customers.length) * 100) : 0;
+  const missingDsgvoRatio = customers.length ? Math.round((customersWithMissingDsgvo.length / customers.length) * 100) : 0;
   const visibleActivities = isMobile ? activities.slice(0, 5) : activities.slice(0, 4);
   const visibleTasks = isMobile ? combinedTasks.slice(0, 6) : combinedTasks.slice(0, 5);
 
@@ -202,6 +213,25 @@ export default function Dashboard() {
         </motion.div>
 
       </motion.div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <Card className="glass-card card-premium p-4 rounded-2xl border-rose-500/20">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs uppercase tracking-wider text-muted-foreground">Data Health: Kundenprofile</span>
+            <ShieldCheck className="h-4 w-4 text-emerald-400" />
+          </div>
+          <p className="text-2xl font-black text-foreground">{incompleteCustomerRatio}%</p>
+          <p className="text-xs text-muted-foreground">{incompleteCustomerProfiles.length} von {customers.length} Profilen sind unvollständig.</p>
+        </Card>
+        <Card className="glass-card card-premium p-4 rounded-2xl border-amber-500/20">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs uppercase tracking-wider text-muted-foreground">Data Health: DSGVO</span>
+            <AlertCircle className="h-4 w-4 text-amber-400" />
+          </div>
+          <p className="text-2xl font-black text-foreground">{missingDsgvoRatio}%</p>
+          <p className="text-xs text-muted-foreground">{customersWithMissingDsgvo.length} Kunden ohne DSGVO-Dokument.</p>
+        </Card>
+      </div>
 
       {/* Zone 4 & 5: Main Grid - 3 Columns (1:2 ratio) */}
       <motion.div

@@ -31,7 +31,12 @@ import { getAppointments, getOpenFollowups } from "@/components/utils/calendar";
 import { logDocumentUploaded } from "@/components/utils/historyLogger";
 import { FloatingActionButton } from "@/components/ui/floating-action-button";
 import { useIsMobile } from "@/lib/hooks/useMediaQuery";
-import { validateCustomerData } from "@/lib/validators";
+import {
+  getCustomerLifecycleChecklist,
+  normalizeCustomerContactData,
+  validateCustomerData
+} from "@/lib/validators";
+import { CONTRACT_STATUS, CUSTOMER_LIFECYCLE_PHASE_OPTIONS, CUSTOMER_LIFECYCLE_PHASES } from "@/lib/statusEnums";
 import { motion } from "framer-motion";
 
 const pageVariants = {
@@ -66,6 +71,7 @@ export default function CustomerDetail({ isSplitView = false }) {
     notes: ""
   });
   const [errors, setErrors] = useState({});
+  const [lifecyclePhase, setLifecyclePhase] = useState(CUSTOMER_LIFECYCLE_PHASES.LEAD);
 
   const [uploading, setUploading] = useState(false);
   const [creationStep, setCreationStep] = useState(0); // 0: Typ wählen, 1: Basisdaten, 2: DSGVO
@@ -133,6 +139,7 @@ export default function CustomerDetail({ isSplitView = false }) {
   useEffect(() => {
     if (customer) {
       setCustomerType(customer.customer_type || "privat");
+      setLifecyclePhase(customer.lifecycle_phase || CUSTOMER_LIFECYCLE_PHASES.LEAD);
       setFormData({
         first_name: customer.first_name || "",
         last_name: customer.last_name || "",
@@ -203,6 +210,7 @@ export default function CustomerDetail({ isSplitView = false }) {
         ...data,
         customer_type: customerType,
         branch_name: branch?.name || "",
+        lifecycle_phase: lifecyclePhase,
         status: "draft",
         identity_documents: JSON.stringify([]),
         address: normalizedAddress,
@@ -245,6 +253,7 @@ export default function CustomerDetail({ isSplitView = false }) {
       return base44.entities.Customer.update(customerId, {
         ...data,
         branch_name: branch?.name || "",
+        lifecycle_phase: lifecyclePhase,
         address: normalizedAddress,
         postal_code: addressData.postal_code,
         city: addressData.city,
@@ -376,11 +385,19 @@ export default function CustomerDetail({ isSplitView = false }) {
       if (!formData.company_name?.trim()) newErrors.company_name = "Firmenname ist Pflicht";
     }
 
-    if (!formData.phone?.trim()) newErrors.phone = "Telefonnummer ist Pflicht";
-    if (!addressData.street?.trim()) newErrors.street = "Straße fehlt";
-    if (!addressData.postal_code?.trim()) newErrors.postal_code = "PLZ fehlt";
-    if (!addressData.city?.trim()) newErrors.city = "Stadt fehlt";
-    if (!formData.branch_id) newErrors.branch_id = "Filiale auswählen";
+    const normalizedAddress = `${addressData.street} ${addressData.house_number}`.trim();
+    const checklistSource = {
+      ...formData,
+      address: normalizedAddress,
+      postal_code: addressData.postal_code,
+      city: addressData.city,
+      dsgvo_document_url: dsgvoUploadedUrl || customer?.dsgvo_document_url
+    };
+
+    const checklist = getCustomerLifecycleChecklist(checklistSource, lifecyclePhase);
+    checklist.filter(item => !item.complete).forEach(item => {
+      newErrors[item.key] = `${item.label} ist in dieser Phase Pflicht`;
+    });
 
     // Format-Validierung (E-Mail etc.)
     try {
@@ -416,10 +433,34 @@ export default function CustomerDetail({ isSplitView = false }) {
     }
     setErrors({});
 
+    const normalizedContactData = normalizeCustomerContactData({
+      ...formData,
+      city: addressData.city,
+      postal_code: addressData.postal_code
+    });
+
+    const normalizedPayload = {
+      ...formData,
+      first_name: normalizedContactData.first_name,
+      last_name: normalizedContactData.last_name,
+      company_name: normalizedContactData.company_name,
+      email: normalizedContactData.email,
+      phone: normalizedContactData.phone
+    };
+
+    setFormData(prev => ({
+      ...prev,
+      first_name: normalizedPayload.first_name,
+      last_name: normalizedPayload.last_name,
+      company_name: normalizedPayload.company_name,
+      email: normalizedPayload.email,
+      phone: normalizedPayload.phone
+    }));
+
     if (isNew && creationStep === 1) {
-      createDraftMutation.mutate(formData);
+      createDraftMutation.mutate(normalizedPayload);
     } else {
-      updateMutation.mutate(formData);
+      updateMutation.mutate(normalizedPayload);
     }
   };
 
@@ -470,7 +511,15 @@ export default function CustomerDetail({ isSplitView = false }) {
     ? JSON.parse(customer.identity_documents)
     : [];
 
-  const activeContracts = contracts.filter(c => c.status === 'aktiv');
+  const activeContracts = contracts.filter(c => c.status === CONTRACT_STATUS.ACTIVE);
+  const customerChecklist = getCustomerLifecycleChecklist({
+    ...formData,
+    address: `${addressData.street} ${addressData.house_number}`.trim(),
+    postal_code: addressData.postal_code,
+    city: addressData.city,
+    dsgvo_document_url: dsgvoUploadedUrl || customer?.dsgvo_document_url
+  }, lifecyclePhase);
+  const missingCustomerChecklist = customerChecklist.filter(item => !item.complete);
   const totalMonthlyFees = activeContracts.reduce((sum, c) => sum + (c.monthly_fee || 0), 0);
   const totalCommission = contracts.reduce((sum, c) => sum + (c.commission || 0), 0);
 
@@ -659,6 +708,17 @@ export default function CustomerDetail({ isSplitView = false }) {
         </div>
       )}
 
+
+
+      {!isNew && customer && missingCustomerChecklist.length > 0 && (
+        <Card className="p-4 bg-amber-500/10 border-amber-500/30">
+          <p className="text-sm font-semibold text-amber-300 mb-2">Pflichtdaten fehlen ({lifecyclePhase})</p>
+          <ul className="text-xs text-amber-200 space-y-1 list-disc pl-4">
+            {missingCustomerChecklist.map(item => <li key={item.key}>{item.label}</li>)}
+          </ul>
+        </Card>
+      )}
+
       {/* NEW CENTERED CREATION FLOW */}
       {
         (isNew || (customer?.status === "draft" && creationStep > 0)) ?
@@ -722,6 +782,33 @@ export default function CustomerDetail({ isSplitView = false }) {
               {creationStep === 1 && (
                 <Card className="p-6 md:p-8 bg-[#181B21] border-[#2D3139]">
                   <div className="space-y-8">
+                    <div className="space-y-1.5">
+                      <Label>Lebenszyklusphase</Label>
+                      <Select value={lifecyclePhase} onValueChange={setLifecyclePhase}>
+                        <SelectTrigger className="bg-[#1F2228]">
+                          <SelectValue placeholder="Phase wählen" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#181B21] border-[#2D3139]">
+                          {CUSTOMER_LIFECYCLE_PHASE_OPTIONS.map(phase => (
+                            <SelectItem key={phase.value} value={phase.value}>{phase.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <Card className="p-4 bg-[#1F2228] border-[#2D3139]">
+                      <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Pflicht-Checkliste</p>
+                      <div className="space-y-1">
+                        {customerChecklist.map(item => (
+                          <div key={item.key} className="text-sm flex items-center justify-between">
+                            <span>{item.label}</span>
+                            <span className={cn(item.complete ? "text-emerald-400" : "text-rose-400")}>
+                              {item.complete ? "Erfüllt" : "Fehlt"}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </Card>
 
                     {/* Section: Who */}
                     <div className="space-y-4">
