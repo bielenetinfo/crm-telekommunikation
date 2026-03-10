@@ -1,7 +1,23 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { base44 } from "@/api/base44Client";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useAllCustomersQuery,
+  useBranchesQuery,
+  useCustomerActivitiesQuery,
+  useCustomerContractsQuery,
+  useCustomerHistoryQuery,
+  useCustomerQuery,
+} from "@/features/customers/api/customers.hooks";
+import {
+  createCustomer,
+  createCustomerHistory,
+  deleteContract,
+  deleteCustomer,
+  updateCustomer,
+  updateCustomerHistory,
+  uploadCoreFile,
+} from "@/features/customers/api/customers.service";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -89,52 +105,17 @@ export default function CustomerDetail({ isSplitView = false }) {
   const [showAddHistoryModal, setShowAddHistoryModal] = useState(false);
   const [showDsgvoPreview, setShowDsgvoPreview] = useState(false);
 
-  const { data: customer } = useQuery({
-    queryKey: ['customer', customerId],
-    queryFn: async () => {
-      const customers = await base44.entities.Customer.list();
-      return customers.find(c => c.id === customerId);
-    },
-    enabled: !!customerId && !isNew
-  });
+  const { data: customer } = useCustomerQuery(customerId, !isNew);
 
-  const { data: contracts = [] } = useQuery({
-    queryKey: ['contracts', customerId],
-    queryFn: async () => {
-      const allContracts = await base44.entities.Contract.list();
-      return allContracts.filter(c => c.customer_id === customerId && !c.is_deleted);
-    },
-    enabled: !!customerId && !isNew
-  });
+  const { data: contracts = [] } = useCustomerContractsQuery(customerId, !isNew);
 
-  const { data: branches = [] } = useQuery({
-    queryKey: ['branches'],
-    queryFn: () => base44.entities.Branch.list()
-  });
+  const { data: branches = [] } = useBranchesQuery();
 
-  const { data: allCustomers = [] } = useQuery({
-    queryKey: ['customers'],
-    queryFn: () => base44.entities.Customer.list(),
-    enabled: isNew
-  });
+  const { data: allCustomers = [] } = useAllCustomersQuery(isNew);
 
-  const { data: activities = [] } = useQuery({
-    queryKey: ['activities', customerId],
-    queryFn: async () => {
-      const allActivities = await base44.entities.Activity.list('-created_date', 50);
-      return allActivities.filter(a => a.customer_id === customerId);
-    },
-    enabled: !!customerId && !isNew
-  });
+  const { data: activities = [] } = useCustomerActivitiesQuery(customerId, !isNew);
 
-  const { data: history = [] } = useQuery({
-    queryKey: ['customerHistory', customerId],
-    queryFn: async () => {
-      const allHistory = await base44.entities.CustomerHistory.list('-created_date', 200);
-      return allHistory.filter(h => h.customer_id === customerId);
-    },
-    enabled: !!customerId && !isNew
-  });
+  const { data: history = [] } = useCustomerHistoryQuery(customerId, !isNew);
 
   useEffect(() => {
     if (customer) {
@@ -206,7 +187,7 @@ export default function CustomerDetail({ isSplitView = false }) {
         addressData.postal_code,
         addressData.city
       );
-      return base44.entities.Customer.create({
+      return createCustomer({
         ...data,
         customer_type: customerType,
         branch_name: branch?.name || "",
@@ -227,7 +208,7 @@ export default function CustomerDetail({ isSplitView = false }) {
 
   const completeDraftMutation = useMutation({
     mutationFn: () => {
-      return base44.entities.Customer.update(customerId, {
+      return updateCustomer(customerId, {
         dsgvo_document_url: dsgvoUploadedUrl || "",
         status: "complete"
       });
@@ -250,7 +231,7 @@ export default function CustomerDetail({ isSplitView = false }) {
         addressData.postal_code,
         addressData.city
       );
-      return base44.entities.Customer.update(customerId, {
+      return updateCustomer(customerId, {
         ...data,
         branch_name: branch?.name || "",
         lifecycle_phase: lifecyclePhase,
@@ -267,7 +248,7 @@ export default function CustomerDetail({ isSplitView = false }) {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: () => base44.entities.Customer.delete(customerId),
+    mutationFn: () => deleteCustomer(customerId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       navigate(createPageUrl('Customers'));
@@ -275,7 +256,7 @@ export default function CustomerDetail({ isSplitView = false }) {
   });
 
   const deleteContractMutation = useMutation({
-    mutationFn: (contractId) => base44.entities.Contract.delete(contractId),
+    mutationFn: (contractId) => deleteContract(contractId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contracts', customerId] });
     }
@@ -287,7 +268,7 @@ export default function CustomerDetail({ isSplitView = false }) {
         ? customer.company_name
         : `${customer.first_name} ${customer.last_name}`;
 
-      return base44.entities.CustomerHistory.create({
+      return createCustomerHistory({
         customer_id: customerId,
         customer_name: customerName,
         type: data.type,
@@ -310,7 +291,7 @@ export default function CustomerDetail({ isSplitView = false }) {
 
   const markHistoryDoneMutation = useMutation({
     mutationFn: (historyId) => {
-      return base44.entities.CustomerHistory.update(historyId, {
+      return updateCustomerHistory(historyId, {
         status: "done"
       });
     },
@@ -472,7 +453,7 @@ export default function CustomerDetail({ isSplitView = false }) {
 
     setUploading(true);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const { file_url } = await uploadCoreFile(file);
       setDsgvoUploadedUrl(file_url);
       setDsgvoSigned(true);
     } catch (error) {
@@ -487,14 +468,14 @@ export default function CustomerDetail({ isSplitView = false }) {
 
     setUploading(true);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const { file_url } = await uploadCoreFile(file);
 
       const currentDocs = customer?.identity_documents
         ? JSON.parse(customer.identity_documents)
         : [];
       const newDocs = [...currentDocs, { url: file_url, name: file.name, date: new Date().toISOString() }];
 
-      await base44.entities.Customer.update(customerId, {
+      await updateCustomer(customerId, {
         identity_documents: JSON.stringify(newDocs)
       });
 
@@ -1692,8 +1673,8 @@ export default function CustomerDetail({ isSplitView = false }) {
                               setUploading(true);
                               try {
                                 const file = new File([result.blob], result.fileName, { type: "application/pdf" });
-                                const { file_url } = await base44.integrations.Core.UploadFile({ file });
-                                await base44.entities.Customer.update(customerId, { dsgvo_document_url: file_url });
+                                const { file_url } = await uploadCoreFile(file);
+                                await updateCustomer(customerId, { dsgvo_document_url: file_url });
                                 await logDocumentUploaded(customerId, getCustomerDisplayName(), "DSGVO-Einwilligung (Automatisch generiert)");
                                 queryClient.invalidateQueries({ queryKey: ['customer', customerId] });
                                 toast.success("DSGVO-Dokument wurde automatisch im CRM gespeichert");
@@ -1732,8 +1713,8 @@ export default function CustomerDetail({ isSplitView = false }) {
                             if (!file) return;
                             setUploading(true);
                             try {
-                              const { file_url } = await base44.integrations.Core.UploadFile({ file });
-                              await base44.entities.Customer.update(customerId, { dsgvo_document_url: file_url });
+                              const { file_url } = await uploadCoreFile(file);
+                              await updateCustomer(customerId, { dsgvo_document_url: file_url });
                               await logDocumentUploaded(customerId, getCustomerDisplayName(), "DSGVO-Einwilligung");
                               queryClient.invalidateQueries({ queryKey: ['customer', customerId] });
                             } catch (error) {

@@ -1,6 +1,5 @@
 import { useState, useEffect, useDeferredValue } from "react";
-import { base44 } from "@/api/base44Client";
-import { useQuery } from "@tanstack/react-query";
+import { useCustomersQuery, useContractsQuery } from "@/features/customers/api/customers.hooks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -46,15 +45,9 @@ export default function Customers() {
     }
   }, [addressFilter]);
 
-  const { data: customers = [], isLoading } = useQuery({
-    queryKey: ['customers'],
-    queryFn: () => base44.entities.Customer.list('-created_date')
-  });
+  const { data: customers = [], isLoading } = useCustomersQuery();
 
-  const { data: contracts = [] } = useQuery({
-    queryKey: ['contracts'],
-    queryFn: () => base44.entities.Contract.list()
-  });
+  const { data: contracts = [] } = useContractsQuery();
 
   const filteredCustomers = customers.filter(c => {
     const searchLower = deferredSearch.toLowerCase();
