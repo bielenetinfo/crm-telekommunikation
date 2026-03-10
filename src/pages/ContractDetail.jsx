@@ -28,6 +28,7 @@ import { toast } from "sonner";
 import { FloatingActionButton } from "@/components/ui/floating-action-button";
 import { useIsMobile } from "@/lib/hooks/useMediaQuery";
 import { validateContractData } from "@/lib/validators";
+import { PIPELINE_STAGES, PIPELINE_STAGE_LABELS, PIPELINE_FIELD_LABELS, getStageMissingFields } from "@/lib/pipeline";
 import { motion } from "framer-motion";
 
 const pageVariants = {
@@ -58,6 +59,10 @@ export default function ContractDetail() {
     commission: "",
     status: "aktiv",
     vvl_status: "offen",
+    pipeline_stage: "lead",
+    contact_channel: "",
+    next_appointment_date: "",
+    expected_revenue: "",
     notes: "",
     tariff_name: "",
     tariff_details: "",
@@ -208,6 +213,10 @@ export default function ContractDetail() {
         commission: contract.commission || "",
         status: contract.status || "aktiv",
         vvl_status: contract.vvl_status || "offen",
+        pipeline_stage: contract.pipeline_stage || "lead",
+        contact_channel: contract.contact_channel || "",
+        next_appointment_date: contract.next_appointment_date || "",
+        expected_revenue: contract.expected_revenue || "",
         notes: contract.notes || "",
         tariff_name: contract.tariff_name || "",
         tariff_details: contract.tariff_details || "",
@@ -247,6 +256,10 @@ export default function ContractDetail() {
         commission: data.commission ? parseFloat(data.commission) : null,
         status: data.status,
         vvl_status: data.vvl_status,
+        pipeline_stage: data.pipeline_stage || "lead",
+        contact_channel: data.contact_channel || "",
+        next_appointment_date: data.next_appointment_date || null,
+        expected_revenue: data.expected_revenue ? parseFloat(data.expected_revenue) : null,
         notes: data.notes,
         tariff_name: data.tariff_name || "",
         tariff_details: data.tariff_details || "",
@@ -310,6 +323,10 @@ export default function ContractDetail() {
         commission: data.commission ? parseFloat(data.commission) : null,
         status: data.status,
         vvl_status: data.vvl_status,
+        pipeline_stage: data.pipeline_stage || "lead",
+        contact_channel: data.contact_channel || "",
+        next_appointment_date: data.next_appointment_date || null,
+        expected_revenue: data.expected_revenue ? parseFloat(data.expected_revenue) : null,
         notes: data.notes,
         tariff_name: data.tariff_name || "",
         tariff_details: data.tariff_details || "",
@@ -448,6 +465,10 @@ export default function ContractDetail() {
     if (!formData.contract_number?.trim()) newErrors.contract_number = "Vertragsnummer ist Pflicht";
     if (!formData.contract_duration_months) newErrors.contract_duration_months = "Laufzeit wählen";
     if (!formData.category) newErrors.category = "Kategorie auswählen";
+    const missingStageFields = getStageMissingFields(formData.pipeline_stage, formData);
+    missingStageFields.forEach((field) => {
+      newErrors[field] = `${PIPELINE_FIELD_LABELS[field]} ist in Phase ${PIPELINE_STAGE_LABELS[formData.pipeline_stage]} Pflicht`;
+    });
 
     try {
       validateContractData({
@@ -883,6 +904,67 @@ export default function ContractDetail() {
                 <SelectItem value="verlängert" className="text-[#EAECEF]">Verlängert</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+        </div>
+      </Card>
+
+      {/* Laufzeit */}
+      <Card className="app-form-panel p-5">
+        <h3 className="text-sm font-semibold text-[#9CA3AF] uppercase tracking-wider mb-4">Pipeline-Steuerung</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <Label className="text-[#EAECEF]">Phase *</Label>
+            <Select value={formData.pipeline_stage || "lead"} onValueChange={(v) => handleFieldChange("pipeline_stage", v)}>
+              <SelectTrigger className="mt-2 bg-[#1F2228] border-[#2D3139] text-[#EAECEF]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-[#1F2228] border-[#2D3139]">
+                {PIPELINE_STAGES.map((stage) => (
+                  <SelectItem key={stage} value={stage} className="text-[#EAECEF]">{PIPELINE_STAGE_LABELS[stage]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label className="text-[#EAECEF]">Kontaktkanal</Label>
+            <Select value={formData.contact_channel || ""} onValueChange={(v) => handleFieldChange("contact_channel", v)}>
+              <SelectTrigger className={cn("mt-2 bg-[#1F2228] border-[#2D3139] text-[#EAECEF]", errors.contact_channel && "border-red-500")}>
+                <SelectValue placeholder="Kanal wählen..." />
+              </SelectTrigger>
+              <SelectContent className="bg-[#1F2228] border-[#2D3139]">
+                <SelectItem value="telefon" className="text-[#EAECEF]">Telefon</SelectItem>
+                <SelectItem value="email" className="text-[#EAECEF]">E-Mail</SelectItem>
+                <SelectItem value="whatsapp" className="text-[#EAECEF]">WhatsApp</SelectItem>
+                <SelectItem value="vor_ort" className="text-[#EAECEF]">Vor Ort</SelectItem>
+              </SelectContent>
+            </Select>
+            {errors.contact_channel && <p className="text-xs text-red-500 mt-1">{errors.contact_channel}</p>}
+          </div>
+
+          <div>
+            <Label className="text-[#EAECEF]">Nächster Termin</Label>
+            <Input
+              type="date"
+              value={formData.next_appointment_date || ""}
+              onChange={(e) => handleFieldChange("next_appointment_date", e.target.value)}
+              className={cn("mt-2 bg-[#1F2228] border-[#2D3139] text-[#EAECEF]", errors.next_appointment_date && "border-red-500")}
+            />
+            {errors.next_appointment_date && <p className="text-xs text-red-500 mt-1">{errors.next_appointment_date}</p>}
+          </div>
+
+          <div>
+            <Label className="text-[#EAECEF]">Erwarteter Umsatz (€)</Label>
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              value={formData.expected_revenue || ""}
+              onChange={(e) => handleFieldChange("expected_revenue", e.target.value)}
+              className={cn("mt-2 bg-[#1F2228] border-[#2D3139] text-[#EAECEF]", errors.expected_revenue && "border-red-500")}
+              placeholder="z.B. 1299.00"
+            />
+            {errors.expected_revenue && <p className="text-xs text-red-500 mt-1">{errors.expected_revenue}</p>}
           </div>
         </div>
       </Card>

@@ -11,6 +11,7 @@ import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
+import { buildAutoFollowupEntries } from "@/lib/pipeline";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -50,6 +51,16 @@ export default function Reminders() {
     queryFn: () => base44.entities.Reminder.list('-created_date')
   });
 
+  const { data: contracts = [] } = useQuery({
+    queryKey: ['contracts'],
+    queryFn: () => base44.entities.Contract.list('-created_date')
+  });
+
+  const { data: activities = [] } = useQuery({
+    queryKey: ['activities'],
+    queryFn: () => base44.entities.Activity.list('-timestamp', 500)
+  });
+
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => base44.entities.Reminder.update(id, data),
     onSuccess: () => {
@@ -87,6 +98,8 @@ export default function Reminders() {
     return matchesSearch && matchesStatus;
   });
 
+  const autoFollowups = buildAutoFollowupEntries({ contracts, activities });
+
   return (
     <div className="app-page-shell">
       {/* Header - Dashboard Pattern */}
@@ -98,8 +111,28 @@ export default function Reminders() {
           <p className="text-sm text-muted-foreground font-medium mt-0.5">
             {reminders.length} Erinnerungen
           </p>
+          <p className="text-xs text-amber-400 mt-1">Automatische Follow-ups: {autoFollowups.length}</p>
         </div>
       </div>
+
+      {autoFollowups.length > 0 && (
+        <Card className="p-4 bg-card border-border">
+          <h3 className="font-semibold text-foreground mb-3">Automatische Follow-up-Regeln</h3>
+          <div className="space-y-2">
+            {autoFollowups.slice(0, 5).map((entry) => (
+              <div key={entry.id} className="flex items-center justify-between gap-3 p-2 rounded-lg bg-secondary/50">
+                <div>
+                  <p className="text-sm font-medium text-foreground">{entry.title}</p>
+                  <p className="text-xs text-muted-foreground">{entry.customer_name}</p>
+                </div>
+                <Badge className={cn("text-xs", entry.severity === 'dringend' ? 'bg-rose-500/15 text-rose-400' : entry.severity === 'hoch' ? 'bg-amber-500/15 text-amber-400' : 'bg-blue-500/15 text-blue-400')}>
+                  {entry.rule}
+                </Badge>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">

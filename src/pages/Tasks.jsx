@@ -14,6 +14,7 @@ import { useIsMobile } from "@/lib/hooks/useMediaQuery";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
+import { buildAutoFollowupEntries } from "@/lib/pipeline";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -38,6 +39,18 @@ export default function Tasks() {
     queryKey: ['tasks'],
     queryFn: () => base44.entities.Task.list()
   });
+
+  const { data: contracts = [] } = useQuery({
+    queryKey: ['contracts'],
+    queryFn: () => base44.entities.Contract.list('-created_date')
+  });
+
+  const { data: activities = [] } = useQuery({
+    queryKey: ['activities'],
+    queryFn: () => base44.entities.Activity.list('-timestamp', 500)
+  });
+
+  const autoFollowupTasks = buildAutoFollowupEntries({ contracts, activities });
 
   const createTaskMutation = useMutation({
     mutationFn: (data) => base44.entities.Task.create(data),
@@ -67,7 +80,20 @@ export default function Tasks() {
     }
   });
 
-  const filteredTasks = tasks.filter(t => {
+  const mergedTasks = [
+    ...tasks,
+    ...autoFollowupTasks.map((entry) => ({
+      id: entry.id,
+      title: entry.title,
+      status: 'offen',
+      priority: entry.severity === 'dringend' ? 'dringend' : entry.severity === 'hoch' ? 'hoch' : 'normal',
+      customer_name: entry.customer_name,
+      due_date: entry.due_date,
+      isAutoRule: true
+    }))
+  ];
+
+  const filteredTasks = mergedTasks.filter(t => {
     const matchesFilter = filter === "all" || t.status === filter;
     const matchesSearch = !search ||
       t.title?.toLowerCase().includes(search.toLowerCase()) ||
@@ -101,7 +127,7 @@ export default function Tasks() {
             Aufgaben
           </h1>
           <p className="text-sm text-muted-foreground font-medium mt-0.5">
-            {filteredTasks.length} von {tasks.length} Aufgaben
+            {filteredTasks.length} von {mergedTasks.length} Aufgaben
           </p>
         </div>
 
@@ -121,16 +147,16 @@ export default function Tasks() {
         className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-6"
       >
         <motion.div variants={itemVariants}>
-          <KpiCard icon={ListTodo} value={tasks.length} label="Gesamt Aufgaben" color="blue" />
+          <KpiCard icon={ListTodo} value={mergedTasks.length} label="Gesamt Aufgaben" color="blue" />
         </motion.div>
         <motion.div variants={itemVariants}>
-          <KpiCard icon={Clock} value={tasks.filter(t => t.status === 'offen').length} label="Offen" color="amber" />
+          <KpiCard icon={Clock} value={mergedTasks.filter(t => t.status === 'offen').length} label="Offen" color="amber" />
         </motion.div>
         <motion.div variants={itemVariants}>
-          <KpiCard icon={CheckCheck} value={tasks.filter(t => t.status === 'erledigt').length} label="Erledigt" color="green" />
+          <KpiCard icon={CheckCheck} value={mergedTasks.filter(t => t.status === 'erledigt').length} label="Erledigt" color="green" />
         </motion.div>
         <motion.div variants={itemVariants}>
-          <KpiCard icon={AlertTriangle} value={tasks.filter(t => t.priority === 'dringend').length} label="Dringend" color="rose" />
+          <KpiCard icon={AlertTriangle} value={mergedTasks.filter(t => t.priority === 'dringend').length} label="Dringend" color="rose" />
         </motion.div>
       </motion.div>
 

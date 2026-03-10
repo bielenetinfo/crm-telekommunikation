@@ -13,6 +13,7 @@ import CommandPalette from "@/components/search/CommandPalette";
 import { FloatingActionButton } from "@/components/ui/floating-action-button";
 import { useIsMobile } from "@/lib/hooks/useMediaQuery";
 import { motion } from "framer-motion";
+import { KPI_TARGETS, getKpiSignal, getSignalClasses } from "@/lib/pipeline";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -77,6 +78,34 @@ export default function Dashboard() {
 
   const visibleActivities = isMobile ? activities.slice(0, 5) : activities.slice(0, 4);
   const visibleTasks = isMobile ? combinedTasks.slice(0, 6) : combinedTasks.slice(0, 5);
+
+  const leadContracts = contracts.filter(c => c.pipeline_stage === 'lead').length;
+  const closedContracts = contracts.filter(c => c.pipeline_stage === 'abschluss' || c.status === 'verlängert').length;
+  const conversionRate = leadContracts > 0 ? (closedContracts / leadContracts) * 100 : 0;
+
+  const closedWithDates = contracts.filter(c => c.pipeline_stage === 'abschluss' && c.start_date && c.created_date);
+  const timeToClose = closedWithDates.length
+    ? closedWithDates.reduce((sum, c) => sum + Math.max(0, differenceInDays(new Date(c.start_date), new Date(c.created_date))), 0) / closedWithDates.length
+    : 0;
+
+  const openFollowupsCount = overdueFollowups.length + tasks.filter(t => t.status === 'offen').length;
+
+  const revenueByAdvisor = contracts.reduce((acc, c) => {
+    const advisor = c.advisor_name || c.consultant_name || c.user_name || 'Unzugeordnet';
+    const amount = Number(c.monthly_fee) || Number(c.expected_revenue) || 0;
+    acc[advisor] = (acc[advisor] || 0) + amount;
+    return acc;
+  }, {});
+  const advisorRevenue = Object.keys(revenueByAdvisor).length
+    ? Object.values(revenueByAdvisor).reduce((sum, v) => sum + v, 0) / Object.keys(revenueByAdvisor).length
+    : 0;
+
+  const operationalKpis = [
+    { key: 'conversionRate', value: conversionRate, display: `${conversionRate.toFixed(1)}%` },
+    { key: 'timeToClose', value: timeToClose, display: `${timeToClose.toFixed(1)} Tage` },
+    { key: 'openFollowups', value: openFollowupsCount, display: `${openFollowupsCount}` },
+    { key: 'advisorRevenue', value: advisorRevenue, display: `${advisorRevenue.toFixed(0)} €` }
+  ];
 
   return (
     <div
@@ -202,6 +231,29 @@ export default function Dashboard() {
         </motion.div>
 
       </motion.div>
+
+      <Card className="glass-card card-premium p-4 md:p-5 rounded-2xl md:rounded-3xl border-white/10">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-bold text-foreground">Operative KPI-Steuerung (täglich)</h2>
+          <Badge className="bg-primary/10 text-primary border-primary/20">Ziel + Ampel</Badge>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+          {operationalKpis.map((kpi) => {
+            const target = KPI_TARGETS[kpi.key];
+            const signal = getKpiSignal(kpi.value, target);
+            return (
+              <div key={kpi.key} className="rounded-xl border border-border/50 p-3 bg-card/40">
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{target.label}</p>
+                  <Badge className={cn("text-[10px] border", getSignalClasses(signal.state))}>{signal.state}</Badge>
+                </div>
+                <p className="text-lg font-black">{kpi.display}</p>
+                <p className="text-[11px] text-muted-foreground">Ziel: {target.target}{target.unit} · Status: {signal.label}</p>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
 
       {/* Zone 4 & 5: Main Grid - 3 Columns (1:2 ratio) */}
       <motion.div
