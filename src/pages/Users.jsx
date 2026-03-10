@@ -13,6 +13,7 @@ import { FloatingActionButton } from "@/components/ui/floating-action-button";
 import { useIsMobile } from "@/lib/hooks/useMediaQuery";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { motion } from "framer-motion";
+import { useAuth } from "@/lib/AuthContext";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -28,6 +29,8 @@ const itemVariants = {
 };
 
 export default function Users() {
+  const { hasPermission } = useAuth();
+  const canManageUsers = hasPermission('manage_users');
   const isMobile = useIsMobile();
   const navigate = useNavigate();
   const { data: users = [], isLoading } = useQuery({
@@ -57,7 +60,7 @@ export default function Users() {
         </div>
 
         {/* Desktop: Button - Mobile: FAB */}
-        {!isMobile && (
+        {!isMobile && canManageUsers && (
           <Button
             onClick={() => navigate(`${createPageUrl('UserDetail')}?new=true`)}
             className="btn-premium bg-primary text-primary-foreground hover:bg-primary/90 font-bold px-6 h-12 shadow-lg shadow-primary/20 text-sm rounded-xl"
@@ -177,7 +180,7 @@ export default function Users() {
       </motion.div>
 
       {/* Mobile: FAB */}
-      {isMobile && (
+      {isMobile && canManageUsers && (
         <FloatingActionButton
           actions={[
             {

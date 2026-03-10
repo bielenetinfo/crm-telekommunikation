@@ -16,6 +16,7 @@ import { FloatingActionButton } from "@/components/ui/floating-action-button";
 import { useIsMobile } from "@/lib/hooks/useMediaQuery";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { motion } from "framer-motion";
+import { useAuth } from "@/lib/AuthContext";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -48,6 +49,8 @@ const categoryColors = {
 };
 
 export default function Contracts() {
+  const { hasPermission } = useAuth();
+  const canDeleteContract = hasPermission('delete_contract');
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const [search, setSearch] = useState("");
@@ -262,7 +265,7 @@ export default function Contracts() {
                           </div>
                         )}
 
-                        {contract.commission && (
+                        {canDeleteContract && contract.commission && (
                           <div className="text-left md:text-center">
                             <p className="text-[9px] md:text-[10px] uppercase font-black tracking-widest text-muted-foreground mb-1 md:mb-1.5 flex items-center gap-1 sm:justify-center">
                               <DollarSign className="h-2.5 w-2.5 md:h-3 md:w-3 text-emerald-500" />

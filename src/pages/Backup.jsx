@@ -6,15 +6,22 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
+import { base44 } from "@/api/base44Client";
+import { useAuth } from "@/lib/AuthContext";
 
 export default function Backup() {
+  const { hasPermission } = useAuth();
+  const canExport = hasPermission('export_data');
+  const canImport = hasPermission('import_data');
+  const canReset = hasPermission('reset_system');
   const [isExporting, setIsExporting] = useState(false);
   const [lastBackup, setLastBackup] = useState(new Date().toISOString());
 
   const handleExport = () => {
+    if (!canExport) return;
     setIsExporting(true);
     try {
-      const db = localStorage.getItem('bielenet_db');
+      const db = base44.system.exportData();
       const blob = new Blob([db], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -33,6 +40,7 @@ export default function Backup() {
   };
 
   const handleImport = (e) => {
+    if (!canImport) return;
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -45,8 +53,7 @@ export default function Backup() {
     reader.onload = (event) => {
       try {
         const data = event.target?.result;
-        JSON.parse(data); // Validate JSON
-        localStorage.setItem('bielenet_db', data);
+        base44.system.importData(data);
         toast.success("Daten erfolgreich importiert. System wird neu geladen...");
         setTimeout(() => window.location.reload(), 1500);
       } catch (err) {
@@ -96,7 +103,7 @@ export default function Backup() {
 
             <Button
               onClick={handleExport}
-              disabled={isExporting}
+              disabled={isExporting || !canExport}
               className="w-full btn-premium bg-primary text-primary-foreground hover:bg-primary/90 font-bold h-14 rounded-2xl shadow-lg shadow-primary/20 text-sm uppercase tracking-wider transition-all hover:scale-[1.02]"
             >
               <Save className="h-5 w-5 mr-2" />
@@ -132,6 +139,7 @@ export default function Backup() {
                 type="file"
                 accept=".json"
                 onChange={handleImport}
+                disabled={!canImport}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
               />
               <div className="border-2 border-dashed border-border group-hover:border-primary/50 group-hover:bg-primary/5 rounded-2xl p-8 transition-all flex flex-col items-center justify-center text-center gap-3">
@@ -169,10 +177,11 @@ export default function Backup() {
             </div>
             <Button
               variant="ghost"
+              disabled={!canReset}
               className="w-full border border-rose-500/30 text-rose-500 hover:bg-rose-500/10 hover:text-rose-600 font-bold"
               onClick={() => {
                 if (confirm("⚠️ System komplett zurücksetzen? Alle Änderungen gehen verloren.")) {
-                  localStorage.clear();
+                  base44.system.resetData();
                   window.location.reload();
                 }
               }}

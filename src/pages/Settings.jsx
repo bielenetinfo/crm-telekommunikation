@@ -4,7 +4,7 @@ import { useAuth } from '@/lib/AuthContext';
 import TwoFactorSetup from '@/components/TwoFactorSetup';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { LogOut, User, Shield, Pencil, Save, X, Key } from 'lucide-react';
+import { LogOut, User, Shield, Pencil, Save, X, Key, Download } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -21,6 +21,13 @@ const Settings = () => {
     const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
+    const permissionLabels = {
+        manage_users: 'Benutzerverwaltung',
+        delete_contract: 'Vertragslöschung',
+        export_data: 'Datenexport',
+        import_data: 'Datenimport',
+        reset_system: 'System-Reset'
+    };
 
     const handleLogout = () => {
         logout();
@@ -128,6 +135,19 @@ const Settings = () => {
                                 )}>
                                     {user?.role || 'User'}
                                 </Badge>
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                    {(user?.permissions || []).length > 0 ? (
+                                        user.permissions.map((permission) => (
+                                            <Badge key={permission} variant="outline" className="text-[9px] uppercase tracking-widest font-black">
+                                                {permissionLabels[permission] || permission}
+                                            </Badge>
+                                        ))
+                                    ) : (
+                                        <Badge variant="outline" className="text-[9px] uppercase tracking-widest font-black text-muted-foreground">
+                                            Keine erweiterten Rechte
+                                        </Badge>
+                                    )}
+                                </div>
                             </div>
                         </div>
 
@@ -177,6 +197,16 @@ const Settings = () => {
                         >
                             <LogOut className="h-4 w-4 mr-2" /> Abmelden
                         </Button>
+
+                        {user?.permissions?.includes('export_data') && (
+                            <Button
+                                variant="outline"
+                                onClick={() => navigate('/backup')}
+                                className="w-full h-10 rounded-xl font-bold text-xs border-border hover:border-primary/30 hover:text-primary"
+                            >
+                                <Download className="h-4 w-4 mr-2" /> Export & Backup öffnen
+                            </Button>
+                        )}
                     </CardContent>
                 </Card>
 

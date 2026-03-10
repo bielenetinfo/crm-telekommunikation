@@ -29,6 +29,7 @@ import { FloatingActionButton } from "@/components/ui/floating-action-button";
 import { useIsMobile } from "@/lib/hooks/useMediaQuery";
 import { validateContractData } from "@/lib/validators";
 import { motion } from "framer-motion";
+import { useAuth } from "@/lib/AuthContext";
 
 const pageVariants = {
   hidden: { opacity: 0, y: 10 },
@@ -38,6 +39,8 @@ const pageVariants = {
 const DEFAULT_NOTICE_PERIOD_DAYS = 30;
 
 export default function ContractDetail() {
+  const { hasPermission } = useAuth();
+  const canDeleteContract = hasPermission('delete_contract');
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
@@ -654,18 +657,20 @@ export default function ContractDetail() {
               <FileX className="h-4 w-4 mr-2" />
               Kündigen
             </Button>
-            <Button
-              variant="outline"
-              onClick={() => {
-                if (confirm('⚠️ Vertrag wirklich löschen?')) {
-                  deleteContractMutation.mutate();
-                }
-              }}
-              className="h-10 md:h-11 px-4 md:px-6 rounded-xl border-rose-500/30 text-rose-400 hover:bg-rose-500/10 font-semibold text-xs md:text-sm"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Löschen
-            </Button>
+            {canDeleteContract && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (confirm('⚠️ Vertrag wirklich löschen?')) {
+                    deleteContractMutation.mutate();
+                  }
+                }}
+                className="h-10 md:h-11 px-4 md:px-6 rounded-xl border-rose-500/30 text-rose-400 hover:bg-rose-500/10 font-semibold text-xs md:text-sm"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Löschen
+              </Button>
+            )}
           </div>
         )}
 
@@ -1276,7 +1281,7 @@ export default function ContractDetail() {
                 label: 'Kündigen',
                 onClick: () => setShowCancellationModal(true)
               },
-              {
+              ...(canDeleteContract ? [{
                 icon: Trash2,
                 label: 'Löschen',
                 onClick: () => {
@@ -1284,7 +1289,7 @@ export default function ContractDetail() {
                     deleteContractMutation.mutate();
                   }
                 }
-              }
+              }] : [])
             ] : [])
           ]}
         />

@@ -23,6 +23,10 @@ const DB_KEY = 'bielenet_db';
 const AUTH_KEY = 'bielenet_auth';
 const DB_VERSION_KEY = 'bielenet_db_version';
 const DB_VERSION = '2';
+const ROLE_PERMISSIONS = {
+    admin: ['manage_users', 'delete_contract', 'export_data', 'import_data', 'reset_system'],
+    user: []
+};
 
 // Helper to hash password on first use (migration from plaintext)
 const hashPasswordIfNeeded = async (password) => {
@@ -132,9 +136,36 @@ const saveDb = (db) => {
     localStorage.setItem(DB_KEY, JSON.stringify(db));
 };
 
+const getCurrentSessionUser = () => {
+    const sessionStr = localStorage.getItem(AUTH_KEY);
+    if (!sessionStr) throw new Error('Not authenticated');
+
+    const session = JSON.parse(sessionStr);
+    if (!session.userId || !isSessionValid(session)) {
+        localStorage.removeItem(AUTH_KEY);
+        throw new Error('Session expired');
+    }
+
+    const db = getDb();
+    const user = db.users.find(u => u.id === session.userId);
+    if (!user) throw new Error('User not found');
+
+    return user;
+};
+
+const assertPermission = (permission) => {
+    const user = getCurrentSessionUser();
+    const permissions = ROLE_PERMISSIONS[user.role] || [];
+    if (!permissions.includes(permission)) {
+        throw new Error('Forbidden');
+    }
+    return user;
+};
+
 // --- AUTH MODULE ---
 const auth = {
     createUser: async (email, password, role = "user", fullName = "") => {
+        assertPermission('manage_users');
         if (!validatePassword(password)) {
             throw new Error("Passwort-Policy verletzt: min 8 Zeichen, 1 Zahl, 1 Sonderzeichen");
         }
@@ -352,8 +383,9 @@ const calculateVvlPriority = (cancellationDeadline) => {
 };
 
 // --- ENTITIES MODULE ---
-const createEntityHandler = (collection) => ({
+const createEntityHandler = (collection, authorization = {}) => ({
     list: async (options = {}) => {
+        if (authorization.list) authorization.list(options);
         const items = getDb()[collection] || [];
         if (!options.search) return items;
 
@@ -371,8 +403,12 @@ const createEntityHandler = (collection) => ({
             );
         });
     },
-    get: async (id) => getDb()[collection]?.find(i => i.id === id),
+    get: async (id) => {
+        if (authorization.get) authorization.get(id);
+        return getDb()[collection]?.find(i => i.id === id);
+    },
     create: async (data) => {
+        if (authorization.create) authorization.create(data);
         const db = getDb();
         if (!db[collection]) db[collection] = [];
         const newItem = { id: crypto.randomUUID(), ...data, created_at: new Date().toISOString() };
@@ -381,6 +417,7 @@ const createEntityHandler = (collection) => ({
         return newItem;
     },
     update: async (id, data) => {
+        if (authorization.update) await authorization.update(id, data);
         const db = getDb();
         const idx = db[collection]?.findIndex(i => i.id === id);
         if (idx === -1) throw new Error('Not found');
@@ -390,8 +427,58 @@ const createEntityHandler = (collection) => ({
         return db[collection][idx];
     },
     delete: async (id) => {
+        if (authorization.delete) authorization.delete(id);
         const db = getDb();
         db[collection] = db[collection].filter(i => i.id !== id);
+        saveDb(db);
+    }
+});
+
+const createUserHandler = () => ({
+    list: async () => {
+        assertPermission('manage_users');
+        return getDb().users || [];
+    },
+    get: async (id) => {
+        assertPermission('manage_users');
+        return getDb().users?.find(i => i.id === id);
+    },
+    create: async (data) => {
+        assertPermission('manage_users');
+        const db = getDb();
+        const newItem = { id: crypto.randomUUID(), ...data, created_at: new Date().toISOString() };
+        db.users.push(newItem);
+        saveDb(db);
+        return newItem;
+    },
+    update: async (id, data) => {
+        const sessionUser = getCurrentSessionUser();
+        const isSelfUpdate = sessionUser.id === id;
+        const selfUpdateKeys = ['name', 'password'];
+        const updates = Object.keys(data || {});
+        const isSelfAllowedUpdate = isSelfUpdate && updates.every((key) => selfUpdateKeys.includes(key));
+
+        if (!isSelfAllowedUpdate) {
+            assertPermission('manage_users');
+        }
+
+        const db = getDb();
+        const idx = db.users?.findIndex(i => i.id === id);
+        if (idx === -1) throw new Error('Not found');
+
+        const updatedData = { ...data };
+        if (updatedData.password) {
+            updatedData.password = await hashPasswordIfNeeded(updatedData.password);
+        }
+
+        db.users[idx] = { ...db.users[idx], ...updatedData };
+        saveDb(db);
+        return db.users[idx];
+    },
+    delete: async (id) => {
+        assertPermission('manage_users');
+        const db = getDb();
+        db.users = db.users.filter(i => i.id !== id);
         saveDb(db);
     }
 });
@@ -1185,6 +1272,9 @@ const createContractHandler = () => ({
         return newContract;
     },
     update: async (id, data) => {
+        if (data?.is_deleted) {
+            assertPermission('delete_contract');
+        }
         const db = getDb();
         const idx = db.contracts?.findIndex(i => i.id === id);
         if (idx === -1) throw new Error('Not found');
@@ -1202,6 +1292,7 @@ const createContractHandler = () => ({
         return db.contracts[idx];
     },
     delete: async (id) => {
+        assertPermission('delete_contract');
         const db = getDb();
         db.contracts = db.contracts.filter(i => i.id !== id);
         saveDb(db);
@@ -1210,11 +1301,28 @@ const createContractHandler = () => ({
 
 export const bielenet = {
     auth,
+    system: {
+        exportData: () => {
+            assertPermission('export_data');
+            return localStorage.getItem(DB_KEY) || JSON.stringify(defaultDb);
+        },
+        importData: (data) => {
+            assertPermission('import_data');
+            JSON.parse(data);
+            localStorage.setItem(DB_KEY, data);
+            return true;
+        },
+        resetData: () => {
+            assertPermission('reset_system');
+            localStorage.clear();
+            return true;
+        }
+    },
     entities: {
         Customer: createEntityHandler('customers'),
         Contract: createContractHandler(),
         VvlRecord: createEntityHandler('vvlRecords'),
-        User: createEntityHandler('users'),
+        User: createUserHandler(),
         Branch: createEntityHandler('branches'),
         Provider: createEntityHandler('providers'),
         Task: createEntityHandler('tasks'),
