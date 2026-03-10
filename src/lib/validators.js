@@ -6,6 +6,20 @@
 import DOMPurify from 'dompurify';
 
 /**
+ * Very simple password policy:
+ * - min 8 chars
+ * - at least 1 digit
+ * - at least 1 special char
+ */
+export const validatePassword = (password) => {
+    if (!password || typeof password !== 'string') return false;
+    if (password.length < 8) return false;
+    if (!/[0-9]/.test(password)) return false;
+    if (!/[!@#$%^&*(),.?":{}|<>_\-]/.test(password)) return false;
+    return true;
+};
+
+/**
  * Validates email format
  * @param {string} email - Email address to validate
  * @returns {boolean} - True if valid email format

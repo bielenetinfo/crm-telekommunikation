@@ -5,6 +5,29 @@
 
 import CryptoJS from 'crypto-js';
 
+const HMAC_SECRET = 'BIELENET_SESSION_HMAC_2026';
+
+export const signSession = (sessionObj) => {
+    try {
+        const data = JSON.stringify(sessionObj);
+        return CryptoJS.HmacSHA256(data, HMAC_SECRET).toString();
+    } catch (e) {
+        console.warn('HMAC sign failed', e);
+        return null;
+    }
+};
+
+export const verifySessionSignature = (sessionObj, signature) => {
+    if (!signature) return false;
+    try {
+        const expected = signSession(sessionObj);
+        return signature === expected;
+    } catch (e) {
+        console.warn('HMAC verify failed', e);
+        return false;
+    }
+};
+
 // Session configuration
 const SESSION_DURATION = 8 * 60 * 60 * 1000; // 8 hours in milliseconds
 const LOGIN_ATTEMPT_KEY = 'bielenet_login_attempts';
@@ -37,12 +60,14 @@ export const validateCSRFToken = (token, storedToken) => {
  * @returns {object} - Session object with userId and expiration
  */
 export const createSession = (userId) => {
-    return {
+    const session = {
         userId,
         createdAt: Date.now(),
         expiresAt: Date.now() + SESSION_DURATION,
         csrfToken: generateCSRFToken()
     };
+    session.signature = signSession(session);
+    return session;
 };
 
 /**
@@ -52,6 +77,7 @@ export const createSession = (userId) => {
  */
 export const isSessionValid = (session) => {
     if (!session || !session.expiresAt) return false;
+    if (!verifySessionSignature({ ...session, signature: undefined }, session.signature)) return false;
     return Date.now() < session.expiresAt;
 };
 

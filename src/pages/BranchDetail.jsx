@@ -78,7 +78,7 @@ export default function BranchDetail() {
     };
 
     return (
-        <div className="space-y-3 px-4 md:px-8 pt-3 md:pt-4 pb-24 w-full text-foreground">
+        <div className="app-page-shell">
             <div className="flex items-center gap-6">
                 <Button
                     variant="ghost"
@@ -89,7 +89,7 @@ export default function BranchDetail() {
                     <ArrowLeft className="h-6 w-6 text-muted-foreground" />
                 </Button>
                 <div className="flex-1">
-                    <h1 className="text-4xl md:text-5xl font-black tracking-tight text-gradient">
+                    <h1 className="app-page-title">
                         {isNew ? "Neue Filiale" : formData.name}
                     </h1>
                     <p className="text-sm text-muted-foreground font-medium mt-0.5">
@@ -106,7 +106,7 @@ export default function BranchDetail() {
                 </Button>
             </div>
 
-            <Card className="p-6 bg-[#181B21] border-[#2D3139]">
+            <Card className="app-form-panel p-6">
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">

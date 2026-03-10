@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, Save, Shield, User } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
+import { validatePassword } from "@/lib/validators";
 
 export default function UserDetail() {
   const navigate = useNavigate();
@@ -20,7 +21,8 @@ export default function UserDetail() {
   const [formData, setFormData] = useState({
     full_name: "",
     email: "",
-    role: "user"
+    role: "user",
+    password: ""
   });
 
   const { data: user } = useQuery({
@@ -43,7 +45,7 @@ export default function UserDetail() {
   }, [user]);
 
   const createMutation = useMutation({
-    mutationFn: (data) => base44.auth.createUser(data.email, "temp-password-123", data.role, data.full_name),
+    mutationFn: (data) => base44.auth.createUser(data.email, data.password, data.role, data.full_name),
     onSuccess: (newUser) => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
       navigate(createPageUrl("Users"));
@@ -60,6 +62,10 @@ export default function UserDetail() {
 
   const handleSubmit = () => {
     if (isNew) {
+      if (!validatePassword(formData.password || "")) {
+        alert("Passwort: min. 8 Zeichen, 1 Zahl, 1 Sonderzeichen");
+        return;
+      }
       createMutation.mutate(formData);
     } else {
       updateMutation.mutate(formData);
@@ -67,7 +73,7 @@ export default function UserDetail() {
   };
 
   return (
-    <div className="space-y-3 px-4 md:px-8 pt-3 md:pt-4 pb-24 w-full text-foreground">
+    <div className="app-page-shell">
       {/* Header - Dashboard Pattern */}
       <div className="flex items-center gap-6">
         <Button
@@ -79,7 +85,7 @@ export default function UserDetail() {
           <ArrowLeft className="h-6 w-6 text-muted-foreground" />
         </Button>
         <div className="flex-1">
-          <h1 className="text-4xl md:text-5xl font-black tracking-tight text-gradient">
+          <h1 className="app-page-title">
             {isNew ? "Neuer Benutzer" : user?.full_name}
           </h1>
           <p className="text-sm text-muted-foreground font-medium mt-0.5">
@@ -98,7 +104,7 @@ export default function UserDetail() {
         )}
       </div>
 
-      <Card className="p-6 bg-[#181B21] border-[#2D3139]">
+      <Card className="app-form-panel p-6">
         <div className="space-y-6">
           <div>
             <Label className="text-[#EAECEF]">Name</Label>
@@ -121,6 +127,19 @@ export default function UserDetail() {
               disabled={!isNew}
             />
           </div>
+
+          {isNew && (
+            <div>
+              <Label className="text-[#EAECEF]">Passwort</Label>
+              <Input
+                type="password"
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                className="mt-2 bg-[#1F2228] border-[#2D3139] text-[#EAECEF]"
+                placeholder="Mind. 8 Zeichen, 1 Zahl, 1 Sonderzeichen"
+              />
+            </div>
+          )}
 
           <div>
             <Label className="text-[#EAECEF]">Rolle</Label>

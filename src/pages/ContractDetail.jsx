@@ -28,6 +28,12 @@ import { toast } from "sonner";
 import { FloatingActionButton } from "@/components/ui/floating-action-button";
 import { useIsMobile } from "@/lib/hooks/useMediaQuery";
 import { validateContractData } from "@/lib/validators";
+import { motion } from "framer-motion";
+
+const pageVariants = {
+  hidden: { opacity: 0, y: 10 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.3 } }
+};
 
 const DEFAULT_NOTICE_PERIOD_DAYS = 30;
 
@@ -578,33 +584,38 @@ export default function ContractDetail() {
   });
 
   return (
-    <div className="space-y-10 p-2 md:p-6 pb-20">
+    <motion.div
+      variants={pageVariants}
+      initial="hidden"
+      animate="visible"
+      className="app-detail-shell lg:space-y-10"
+    >
       {/* Header - Dashboard Pattern */}
-      <div className="flex items-center gap-6">
+      <div className="app-form-panel p-3 sm:p-4 md:p-5 flex flex-wrap items-start gap-3 md:gap-4">
         <Button
           variant="ghost"
           size="icon"
           onClick={() => navigate(-1)}
-          className="h-12 w-12 rounded-2xl bg-secondary/50 border border-secondary hover:bg-secondary transition-all flex-shrink-0"
+          className="h-11 w-11 md:h-12 md:w-12 rounded-2xl bg-secondary/50 border border-secondary hover:bg-secondary transition-all flex-shrink-0"
         >
           <ArrowLeft className="h-6 w-6 text-muted-foreground" />
         </Button>
         <div className="flex-1 min-w-0">
-          <h1 className="text-4xl md:text-5xl font-black tracking-tight text-gradient">
+          <h1 className="app-page-title">
             {isNew ? "Neuer Vertrag" : (contract?.provider_name || 'Vertrag')}
           </h1>
-          <p className="text-sm font-medium text-muted-foreground mt-1 truncate">
+          <p className="app-page-subtitle truncate">
             {isNew ? "Vertragsdaten erfassen" : contract?.customer_name}
           </p>
         </div>
 
         {/* Desktop: Action Buttons - Mobile: FAB */}
         {!isNew && contract && !isMobile && (
-          <div className="flex items-center gap-3 flex-wrap">
+          <div className="order-3 lg:order-none basis-full lg:basis-auto flex items-center gap-2 md:gap-3 flex-wrap">
             {contract.status === 'aktiv' && ['offen', 'geplant'].includes(contract.vvl_status) && (
               <Button
                 onClick={() => setShowVvlWizard(true)}
-                className="h-11 px-6 rounded-xl bg-emerald-500 text-white font-bold text-sm shadow-lg shadow-emerald-500/20 hover:bg-emerald-600"
+                className="h-10 md:h-11 px-4 md:px-6 rounded-xl bg-emerald-500 text-white font-bold text-xs md:text-sm shadow-lg shadow-emerald-500/20 hover:bg-emerald-600"
               >
                 <RefreshCw className="h-4 w-4 mr-2" />
                 VVL
@@ -630,7 +641,7 @@ export default function ContractDetail() {
                   toast.error('Fehler beim PDF');
                 }
               }}
-              className="h-11 px-6 rounded-xl border-blue-500/30 text-blue-400 hover:bg-blue-500/10 font-semibold text-sm"
+              className="h-10 md:h-11 px-4 md:px-6 rounded-xl border-blue-500/30 text-blue-400 hover:bg-blue-500/10 font-semibold text-xs md:text-sm"
             >
               <Download className="h-4 w-4 mr-2" />
               PDF
@@ -638,7 +649,7 @@ export default function ContractDetail() {
             <Button
               variant="outline"
               onClick={() => setShowCancellationModal(true)}
-              className="h-11 px-6 rounded-xl border-amber-500/30 text-amber-400 hover:bg-amber-500/10 font-semibold text-sm"
+              className="h-10 md:h-11 px-4 md:px-6 rounded-xl border-amber-500/30 text-amber-400 hover:bg-amber-500/10 font-semibold text-xs md:text-sm"
             >
               <FileX className="h-4 w-4 mr-2" />
               Kündigen
@@ -650,7 +661,7 @@ export default function ContractDetail() {
                   deleteContractMutation.mutate();
                 }
               }}
-              className="h-11 px-6 rounded-xl border-rose-500/30 text-rose-400 hover:bg-rose-500/10 font-semibold text-sm"
+              className="h-10 md:h-11 px-4 md:px-6 rounded-xl border-rose-500/30 text-rose-400 hover:bg-rose-500/10 font-semibold text-xs md:text-sm"
             >
               <Trash2 className="h-4 w-4 mr-2" />
               Löschen
@@ -663,7 +674,7 @@ export default function ContractDetail() {
           <Button
             onClick={handleSave}
             disabled={updateMutation.isPending || createMutation.isPending || !formData.customer_id || !formData.provider_id || !formData.start_date}
-            className="btn-premium bg-primary text-primary-foreground font-bold h-12 px-8 rounded-xl shadow-lg shadow-primary/20 text-sm"
+            className="btn-premium bg-primary text-primary-foreground font-bold h-11 md:h-12 px-6 md:px-8 rounded-xl shadow-lg shadow-primary/20 text-sm order-3 sm:order-none"
           >
             <Save className="h-4 w-4 mr-2" />
             {isNew ? 'Erstellen' : 'Speichern'}
@@ -706,7 +717,7 @@ export default function ContractDetail() {
 
       {/* Priority (nur bei bestehendem Vertrag) */}
       {!isNew && contract && priority && (
-        <Card className="p-4 bg-card border border-border">
+        <Card className="app-form-panel p-4">
           <div className="flex items-center gap-3">
             <Target className="h-5 w-5 text-primary" />
             <Badge className={cn("font-bold", colors.text, "bg-transparent border-2", colors.border)}>
@@ -877,7 +888,7 @@ export default function ContractDetail() {
       </Card>
 
       {/* Laufzeit */}
-      <Card className="p-5 bg-[#181B21] border-[#2D3139]">
+      <Card className="app-form-panel p-5">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div>
             <Label className="text-[#EAECEF]">Startdatum *</Label>
@@ -973,7 +984,7 @@ export default function ContractDetail() {
       />
 
       {/* Kosten */}
-      <Card className="p-5 bg-[#181B21] border-[#2D3139]">
+      <Card className="app-form-panel p-5">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <Label className="text-[#EAECEF]">Monatliche Gebühr</Label>
@@ -1081,7 +1092,7 @@ export default function ContractDetail() {
       )}
 
       {/* Notizen - IMMER anzeigen */}
-      <Card className="p-5 bg-[#181B21] border-[#2D3139]">
+      <Card className="app-form-panel p-5">
         <Label className="text-[#EAECEF]">Interne Notizen</Label>
         <Textarea
           value={formData.notes}
@@ -1097,7 +1108,7 @@ export default function ContractDetail() {
 
       {/* Vertragsdokumente Upload - NEU */}
       {isNew && (
-        <Card className="p-5 bg-[#181B21] border-[#2D3139]">
+        <Card className="app-form-panel p-5">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-sm font-semibold text-[#EAECEF]">Vertragsdokumente</h3>
@@ -1169,7 +1180,7 @@ export default function ContractDetail() {
 
       {/* Kundenaktivitäten Preview */}
       {!isNew && contract && customerHistory.length > 0 && (
-        <Card className="p-5 bg-[#181B21] border-[#2D3139]">
+        <Card className="app-form-panel p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-[#9CA3AF] uppercase tracking-wider">
               Letzte Kundenaktivitäten
@@ -1278,6 +1289,6 @@ export default function ContractDetail() {
           ]}
         />
       )}
-    </div>
+    </motion.div>
   );
 }

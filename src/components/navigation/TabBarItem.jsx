@@ -8,9 +8,9 @@ export function TabBarItem({ tab, isActive, onClick }) {
         <button
             onClick={onClick}
             className={cn(
-                'flex flex-col items-center justify-center flex-1 py-2 px-1 relative transition-colors',
-                'min-h-[56px] active:scale-95 transition-transform',
-                isActive ? 'text-primary' : 'text-muted-foreground'
+                'flex flex-col items-center justify-center flex-1 py-2 px-1.5 relative rounded-2xl',
+                'min-h-[58px] active:scale-95 transition-transform motion-reduce:transition-none motion-reduce:active:scale-100',
+                isActive ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
             )}
         >
             {/* Icon */}

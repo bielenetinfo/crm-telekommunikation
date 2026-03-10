@@ -9,6 +9,20 @@ import { Package, Smartphone, Router, Plus, Search, Pencil, Trash2 } from "lucid
 import { cn } from "@/lib/utils";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { toast } from "sonner";
+import { motion } from "framer-motion";
+
+const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+        opacity: 1,
+        transition: { staggerChildren: 0.1 }
+    }
+};
+
+const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
+};
 import {
     AlertDialog,
     AlertDialogAction,
@@ -81,11 +95,11 @@ export default function Hardware() {
     }
 
     return (
-        <div className="space-y-3 px-4 md:px-8 pt-3 md:pt-4 pb-24 w-full text-foreground">
+        <div className="app-page-shell">
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-4xl md:text-5xl font-black tracking-tight text-gradient">
+                    <h1 className="app-page-title">
                         Hardware
                     </h1>
                     <p className="text-sm text-muted-foreground font-medium mt-0.5">
@@ -101,86 +115,108 @@ export default function Hardware() {
             </div>
 
             {/* KPI Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                <KpiCard icon={Package} value={hardware.length} label="Gesamt Geräte" color="blue" />
-                <KpiCard icon={Smartphone} value={hardware.filter(h => h.category === 'Smartphone').length} label="Smartphones" color="purple" />
-                <KpiCard icon={Router} value={hardware.filter(h => h.category === 'Router').length} label="Router" color="green" />
-                <KpiCard
-                    icon={Package}
-                    value={hardware.reduce((sum, h) => sum + (h.stock || 0), 0)}
-                    label="Lagerbestand"
-                    color="amber"
-                />
-            </div>
+            <motion.div
+                variants={containerVariants}
+                initial="hidden"
+                animate="show"
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-6"
+            >
+                <motion.div variants={itemVariants}>
+                    <KpiCard icon={Package} value={hardware.length} label="Gesamt Geräte" color="blue" />
+                </motion.div>
+                <motion.div variants={itemVariants}>
+                    <KpiCard icon={Smartphone} value={hardware.filter(h => h.category === 'Smartphone').length} label="Smartphones" color="purple" />
+                </motion.div>
+                <motion.div variants={itemVariants}>
+                    <KpiCard icon={Router} value={hardware.filter(h => h.category === 'Router').length} label="Router" color="green" />
+                </motion.div>
+                <motion.div variants={itemVariants}>
+                    <KpiCard icon={Package} value={hardware.reduce((sum, h) => sum + (h.stock || 0), 0)} label="Lagerbestand" color="amber" />
+                </motion.div>
+            </motion.div>
 
             {/* Search */}
-            <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                    placeholder="Gerät suchen..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="pl-10 h-12 bg-secondary/30 border-secondary focus:bg-background transition-all"
-                />
-            </div>
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1, type: "spring", stiffness: 300, damping: 24 }}
+                className="glass-card card-premium p-4 rounded-3xl"
+            >
+                <div className="relative max-w-xl">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-hover:text-primary" />
+                    <Input
+                        placeholder="Gerät suchen..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className="pl-11 h-11 bg-secondary/50 border-transparent focus:bg-background focus:border-primary/50 text-foreground rounded-xl font-medium placeholder:text-muted-foreground/50"
+                    />
+                </div>
+            </motion.div>
 
             {/* Hardware Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <motion.div
+                variants={containerVariants}
+                initial="hidden"
+                animate="show"
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mt-6"
+            >
                 {filteredHardware.length === 0 ? (
-                    <div className="col-span-full p-12 text-center text-muted-foreground bg-secondary/10 rounded-3xl border border-dashed border-border">
+                    <div className="col-span-full p-12 text-center text-muted-foreground bg-secondary/10 rounded-3xl border border-dashed border-border/50">
                         Keine Geräte gefunden
                     </div>
                 ) : (
                     filteredHardware.map((item) => (
-                        <Card key={item.id} className="glass-card card-premium overflow-hidden group hover:border-primary/20 transition-all">
-                            <div className="p-6">
-                                <div className="h-24 bg-secondary/30 rounded-2xl flex items-center justify-center mb-4 text-muted-foreground group-hover:text-primary transition-colors">
-                                    {getCategoryIcon(item.category)}
+                        <motion.div variants={itemVariants} key={item.id}>
+                            <Card className="glass-card card-premium overflow-hidden group hover:-translate-y-1 relative transition-all duration-300 border-white/5 hover:border-primary/50">
+                                <div className="p-6">
+                                    <div className="h-24 bg-secondary/30 rounded-2xl flex items-center justify-center mb-4 text-muted-foreground group-hover:text-primary transition-colors border border-border group-hover:bg-primary/10 group-hover:border-primary/20 shadow-sm">
+                                        {getCategoryIcon(item.category)}
+                                    </div>
+                                    <h3 className="font-bold text-foreground text-lg truncate">{item.name}</h3>
+                                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-4">{item.category}</p>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-2xl font-black text-foreground">€{item.price?.toFixed(2)}</span>
+                                        <Badge className={cn(
+                                            "text-xs font-bold",
+                                            item.stock > 5
+                                                ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                                                : item.stock > 0
+                                                    ? "bg-amber-500/10 text-amber-500 border-amber-500/20"
+                                                    : "bg-rose-500/10 text-rose-500 border-rose-500/20"
+                                        )}>
+                                            {item.stock} Stück
+                                        </Badge>
+                                    </div>
+                                    <div className="flex gap-2 mt-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="flex-1 h-9 text-xs"
+                                            onClick={() => {
+                                                const newStock = parseInt(window.prompt("Neuer Lagerbestand:", item.stock) || item.stock, 10);
+                                                base44.entities.Hardware.update(item.id, { stock: newStock }).then(() => {
+                                                    queryClient.invalidateQueries({ queryKey: ['hardware'] });
+                                                    toast.success("Bestand aktualisiert");
+                                                });
+                                            }}
+                                        >
+                                            <Pencil className="h-3 w-3 mr-1" /> Bestand
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-9 text-xs text-rose-500 hover:bg-rose-500/10 hover:text-rose-500"
+                                            onClick={() => setDeleteId(item.id)}
+                                        >
+                                            <Trash2 className="h-3 w-3" />
+                                        </Button>
+                                    </div>
                                 </div>
-                                <h3 className="font-bold text-foreground text-lg truncate">{item.name}</h3>
-                                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-4">{item.category}</p>
-                                <div className="flex items-center justify-between">
-                                    <span className="text-2xl font-black text-foreground">€{item.price?.toFixed(2)}</span>
-                                    <Badge className={cn(
-                                        "text-xs font-bold",
-                                        item.stock > 5
-                                            ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
-                                            : item.stock > 0
-                                                ? "bg-amber-500/10 text-amber-500 border-amber-500/20"
-                                                : "bg-rose-500/10 text-rose-500 border-rose-500/20"
-                                    )}>
-                                        {item.stock} Stück
-                                    </Badge>
-                                </div>
-                                <div className="flex gap-2 mt-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="flex-1 h-9 text-xs"
-                                        onClick={() => {
-                                            const newStock = parseInt(window.prompt("Neuer Lagerbestand:", item.stock) || item.stock, 10);
-                                            base44.entities.Hardware.update(item.id, { stock: newStock }).then(() => {
-                                                queryClient.invalidateQueries({ queryKey: ['hardware'] });
-                                                toast.success("Bestand aktualisiert");
-                                            });
-                                        }}
-                                    >
-                                        <Pencil className="h-3 w-3 mr-1" /> Bestand
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="h-9 text-xs text-rose-500 hover:bg-rose-500/10 hover:text-rose-500"
-                                        onClick={() => setDeleteId(item.id)}
-                                    >
-                                        <Trash2 className="h-3 w-3" />
-                                    </Button>
-                                </div>
-                            </div>
-                        </Card>
+                            </Card>
+                        </motion.div>
                     ))
                 )}
-            </div>
+            </motion.div>
 
             {/* Delete Confirmation */}
             <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>

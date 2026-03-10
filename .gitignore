@@ -26,5 +26,11 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-
-.env
+.npm-cache
+.playwright-cli
+.claude
+output
+deploy.tar
+deploy.tar.gz
+CRM_REQUIREMENTS_ARCHITECTURE.md
+SYSTEM_BESCHREIBUNG.md

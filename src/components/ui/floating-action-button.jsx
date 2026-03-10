@@ -22,6 +22,7 @@ export function FloatingActionButton({ actions = [], className }) {
     // Single action: Direct button
     if (actions.length === 1) {
         const Icon = actions[0].icon;
+        const mobileOffset = 'calc(env(safe-area-inset-bottom, 0px) + 5.25rem)';
         return (
             <button
                 onClick={actions[0].onClick}
@@ -30,10 +31,11 @@ export function FloatingActionButton({ actions = [], className }) {
                     'bg-gradient-to-br from-primary to-primary/80',
                     'text-primary-foreground shadow-2xl shadow-primary/30',
                     'flex items-center justify-center',
-                    'hover:scale-105 active:scale-95 transition-transform',
-                    isMobile ? 'bottom-20 right-4' : 'bottom-8 right-8',
+                    'hover:scale-105 active:scale-95 transition-transform motion-reduce:transition-none motion-reduce:hover:scale-100 motion-reduce:active:scale-100',
+                    isMobile ? 'right-4' : 'bottom-8 right-8',
                     className
                 )}
+                style={isMobile ? { bottom: mobileOffset } : undefined}
             >
                 <Icon className="h-6 w-6" />
             </button>
@@ -41,8 +43,12 @@ export function FloatingActionButton({ actions = [], className }) {
     }
 
     // Multiple actions: Expandable menu
+    const mobileOffset = 'calc(env(safe-area-inset-bottom, 0px) + 5.25rem)';
     return (
-        <div className={cn('fixed z-40', isMobile ? 'bottom-20 right-4' : 'bottom-8 right-8', className)}>
+        <div
+            className={cn('fixed z-40', isMobile ? 'right-4' : 'bottom-8 right-8', className)}
+            style={isMobile ? { bottom: mobileOffset } : undefined}
+        >
             {/* Action Menu */}
             {isOpen && (
                 <div className="absolute bottom-16 right-0 space-y-3">
@@ -59,7 +65,7 @@ export function FloatingActionButton({ actions = [], className }) {
                                     'flex items-center gap-3 px-4 py-3 rounded-xl',
                                     'glass-card border border-border',
                                     'hover:border-primary hover:bg-primary/10',
-                                    'transition-all group whitespace-nowrap'
+                                    'transition-all group whitespace-nowrap motion-reduce:transition-none'
                                 )}
                             >
                                 <ActionIcon className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
@@ -78,7 +84,7 @@ export function FloatingActionButton({ actions = [], className }) {
                     'bg-gradient-to-br from-primary to-primary/80',
                     'text-primary-foreground shadow-2xl shadow-primary/30',
                     'flex items-center justify-center',
-                    'hover:scale-105 active:scale-95 transition-all',
+                    'hover:scale-105 active:scale-95 transition-all motion-reduce:transition-none motion-reduce:hover:scale-100 motion-reduce:active:scale-100',
                     isOpen && 'rotate-45'
                 )}
             >

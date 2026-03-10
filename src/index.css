@@ -3,6 +3,12 @@
 @tailwind utilities;
 
 @layer base {
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
   :root {
     /* Light Mode */
     --background: 0 0% 98%;
@@ -70,11 +76,16 @@
 
   body {
     @apply bg-background text-foreground antialiased overflow-x-hidden font-sans;
-    /* Subtle premium noise/gradient background - cleaned up */
+    /* Subtle premium noise/gradient background */
     background-image:
-      radial-gradient(circle at top right, rgba(255, 195, 0, 0.05), transparent 40%),
-      radial-gradient(circle at bottom left, rgba(255, 195, 0, 0.03), transparent 40%);
+      radial-gradient(circle at 100% 0%, rgba(255, 195, 0, 0.08), transparent 38%),
+      radial-gradient(circle at 0% 100%, rgba(255, 195, 0, 0.05), transparent 42%),
+      linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+    background-size: auto, auto, 24px 24px, 24px 24px;
+    background-position: 0 0, 0 0, 0 0, 0 0;
     background-attachment: fixed;
+    text-rendering: optimizeLegibility;
   }
 
   h1,
@@ -89,39 +100,81 @@
 
 @layer components {
   .glass {
-    @apply bg-background/70 backdrop-blur-xl border-b border-border supports-[backdrop-filter]:bg-background/40;
+    @apply bg-background/80 backdrop-blur-xl border-b border-border supports-[backdrop-filter]:bg-background/50;
   }
 
   .glass-card {
-    @apply bg-card/60 backdrop-blur-md border border-border shadow-lg supports-[backdrop-filter]:bg-card/40;
+    @apply bg-card/60 backdrop-blur-xl border border-border shadow-lg supports-[backdrop-filter]:bg-card/40;
   }
 
   .dark .glass-card {
-    @apply bg-[#15171C]/90 border-white/10 shadow-2xl;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1);
+    @apply bg-[#15171C]/80 border-white/5 shadow-2xl backdrop-blur-2xl;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.05);
   }
 
   .card-premium {
-    @apply bg-gradient-to-br from-card/80 to-card/40 border border-border;
+    @apply bg-gradient-to-br from-card/90 to-card/50 border border-border transition-all duration-300;
   }
 
   .dark .card-premium {
-    @apply border-white/10 bg-[#15171C]/95;
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 210, 77, 0.1);
+    @apply border-white/10 bg-gradient-to-br from-[#1C1F26]/95 to-[#15171C]/95;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.05);
   }
 
   .btn-premium {
-    @apply relative overflow-hidden hover:shadow-lg hover:shadow-primary/25;
+    @apply relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:shadow-primary/25 hover:-translate-y-0.5 active:translate-y-0;
   }
 
   .text-gradient {
     @apply bg-clip-text text-transparent bg-gradient-to-br from-[#FFD24D] via-[#FFC000] to-[#FFAA00] drop-shadow-sm;
+  }
+
+  .app-shell-main {
+    @apply min-w-0 overflow-x-clip;
+  }
+
+  .app-page-wrap {
+    @apply w-full min-w-0;
+  }
+
+  .app-page-shell {
+    @apply w-full mx-auto max-w-[1360px] 2xl:max-w-[1440px] space-y-4 md:space-y-5 px-3 sm:px-4 md:px-6 xl:px-8 pt-4 md:pt-6 pb-28 text-foreground;
+  }
+
+  .app-detail-shell {
+    @apply w-full mx-auto max-w-[1360px] space-y-6 md:space-y-8 px-3 sm:px-4 md:px-6 xl:px-8 pt-4 md:pt-6 pb-28 text-foreground;
+  }
+
+  .app-page-title {
+    @apply text-3xl sm:text-4xl xl:text-[2.85rem] font-black tracking-tight text-gradient leading-[0.95];
+    letter-spacing: -0.03em;
+  }
+
+  .app-page-subtitle {
+    @apply text-sm font-medium text-muted-foreground mt-1;
+  }
+
+  .app-form-panel {
+    @apply glass-card card-premium rounded-2xl md:rounded-3xl border-white/10;
+  }
+
+  .app-page-shell > div.flex.items-center.justify-between:first-child {
+    @apply gap-3 md:gap-4 flex-wrap items-end;
+  }
+
+  .app-page-shell > div.flex.items-center.gap-6:first-child {
+    @apply gap-3 md:gap-4 flex-wrap items-start;
+  }
+
+  .app-page-shell > div.flex.items-center.gap-6:first-child > .flex-1 {
+    min-width: min(100%, 18rem);
   }
 }
 
 /* Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -147,4 +200,37 @@
 
 .dark ::-webkit-scrollbar-thumb:hover {
   background: #FFD24D;
+}
+
+.pb-safe {
+  padding-bottom: max(env(safe-area-inset-bottom), 0px);
+}
+
+.pt-safe {
+  padding-top: max(env(safe-area-inset-top), 0px);
+}
+
+@media (max-width: 767px) {
+  .glass-card {
+    border-radius: 1rem;
+  }
+
+  .app-page-shell > div.flex.items-center.justify-between:first-child {
+    align-items: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:focus-within {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

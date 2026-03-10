@@ -61,7 +61,7 @@ export default function Backup() {
       {/* Header - Dashboard Pattern */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-4xl md:text-5xl font-black tracking-tight text-gradient">
+          <h1 className="app-page-title">
             Backup
           </h1>
           <p className="text-sm text-muted-foreground font-medium mt-0.5">

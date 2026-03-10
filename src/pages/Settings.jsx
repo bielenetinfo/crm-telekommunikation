@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { base44 } from '@/api/base44Client';
 import { toast } from 'sonner';
+import { validatePassword } from '@/lib/validators';
 
 const Settings = () => {
     const { user, logout, refreshUser } = useAuth();
@@ -46,8 +47,8 @@ const Settings = () => {
             toast.error('Passwörter stimmen nicht überein');
             return;
         }
-        if (newPassword.length < 6) {
-            toast.error('Passwort muss mindestens 6 Zeichen haben');
+        if (!validatePassword(newPassword)) {
+            toast.error('Passwort: min. 8 Zeichen, 1 Zahl, 1 Sonderzeichen');
             return;
         }
         try {
@@ -63,11 +64,11 @@ const Settings = () => {
     };
 
     return (
-        <div className="space-y-3 px-4 md:px-8 pt-3 md:pt-4 pb-24 w-full text-foreground">
+        <div className="app-page-shell">
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-4xl md:text-5xl font-black tracking-tight text-gradient">
+                    <h1 className="app-page-title">
                         Einstellungen
                     </h1>
                     <p className="text-sm text-muted-foreground font-medium mt-0.5">

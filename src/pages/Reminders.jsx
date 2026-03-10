@@ -10,6 +10,20 @@ import { Search, Bell, Check, Calendar, Mail, MessageSquare } from "lucide-react
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { motion } from "framer-motion";
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: { staggerChildren: 0.1 }
+  }
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
+};
 
 const statusColors = {
   offen: "bg-amber-500/15 text-amber-400 border-amber-500/30",
@@ -74,11 +88,11 @@ export default function Reminders() {
   });
 
   return (
-    <div className="space-y-3 px-4 md:px-8 pt-3 md:pt-4 pb-24 w-full text-foreground">
+    <div className="app-page-shell">
       {/* Header - Dashboard Pattern */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-4xl md:text-5xl font-black tracking-tight text-gradient">
+          <h1 className="app-page-title">
             Erinnerungen
           </h1>
           <p className="text-sm text-muted-foreground font-medium mt-0.5">
@@ -125,123 +139,129 @@ export default function Reminders() {
           <p className="text-muted-foreground">Erinnerungen werden automatisch für ablaufende Verträge erstellt.</p>
         </Card>
       ) : (
-        <div className="space-y-3">
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="show"
+          className="space-y-3"
+        >
           {filteredReminders.map(reminder => {
             const daysUntil = reminder.days_until_deadline || 0;
             return (
-              <Card
-                key={reminder.id}
-                className="p-5 bg-card border-border hover:border-primary/30 transition-all duration-200"
-              >
-                <div className="flex flex-col lg:flex-row lg:items-center gap-3">
-                  {/* Icon & Info */}
-                  <div className="flex items-start gap-4 flex-1 min-w-0">
-                    <div className={cn(
-                      "h-12 w-12 rounded-xl flex items-center justify-center flex-shrink-0",
-                      daysUntil <= 7 ? "bg-rose-500/20" :
-                        daysUntil <= 14 ? "bg-amber-500/20" :
-                          "bg-blue-500/20"
-                    )}>
-                      <Bell className={cn(
-                        "h-6 w-6",
-                        daysUntil <= 7 ? "text-rose-400" :
-                          daysUntil <= 14 ? "text-amber-400" :
-                            "text-blue-400"
-                      )} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <h3 className="font-semibold text-foreground">{reminder.customer_name}</h3>
-                        <Badge className={cn("text-xs border", statusColors[reminder.status])}>
-                          {reminder.status}
-                        </Badge>
-                        <Badge className={cn("text-xs", typeColors[reminder.reminder_type])}>
-                          {reminder.reminder_type}
-                        </Badge>
-                        {daysUntil >= 0 && (
-                          <Badge className={cn(
-                            "text-xs",
-                            daysUntil <= 7 ? "bg-rose-500/15 text-rose-400" :
-                              daysUntil <= 14 ? "bg-amber-500/15 text-amber-400" :
-                                "bg-blue-500/15 text-blue-400"
-                          )}>
-                            {daysUntil} Tage
+              <motion.div variants={itemVariants} key={reminder.id}>
+                <Card
+                  className="p-5 glass-card card-premium overflow-hidden border-transparent hover:border-primary/30 transition-all duration-300"
+                >
+                  <div className="flex flex-col lg:flex-row lg:items-center gap-3">
+                    {/* Icon & Info */}
+                    <div className="flex items-start gap-4 flex-1 min-w-0">
+                      <div className={cn(
+                        "h-12 w-12 rounded-xl flex items-center justify-center flex-shrink-0",
+                        daysUntil <= 7 ? "bg-rose-500/20" :
+                          daysUntil <= 14 ? "bg-amber-500/20" :
+                            "bg-blue-500/20"
+                      )}>
+                        <Bell className={cn(
+                          "h-6 w-6",
+                          daysUntil <= 7 ? "text-rose-400" :
+                            daysUntil <= 14 ? "text-amber-400" :
+                              "text-blue-400"
+                        )} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <h3 className="font-semibold text-foreground">{reminder.customer_name}</h3>
+                          <Badge className={cn("text-xs border", statusColors[reminder.status])}>
+                            {reminder.status}
                           </Badge>
+                          <Badge className={cn("text-xs", typeColors[reminder.reminder_type])}>
+                            {reminder.reminder_type}
+                          </Badge>
+                          {daysUntil >= 0 && (
+                            <Badge className={cn(
+                              "text-xs",
+                              daysUntil <= 7 ? "bg-rose-500/15 text-rose-400" :
+                                daysUntil <= 14 ? "bg-amber-500/15 text-amber-400" :
+                                  "bg-blue-500/15 text-blue-400"
+                            )}>
+                              {daysUntil} Tage
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                          <span className="font-medium text-primary">{reminder.provider_name}</span>
+                          {reminder.contract_number && (
+                            <>
+                              <span>•</span>
+                              <span>Nr. {reminder.contract_number}</span>
+                            </>
+                          )}
+                          {reminder.cancellation_deadline && (
+                            <>
+                              <span>•</span>
+                              <div className="flex items-center gap-1">
+                                <Calendar className="h-3 w-3" />
+                                <span>Frist: {format(new Date(reminder.cancellation_deadline), 'dd.MM.yyyy', { locale: de })}</span>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                        {reminder.sent_date && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Versendet: {format(new Date(reminder.sent_date), 'dd.MM.yyyy', { locale: de })} via {reminder.sent_via}
+                          </p>
                         )}
                       </div>
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                        <span className="font-medium text-primary">{reminder.provider_name}</span>
-                        {reminder.contract_number && (
-                          <>
-                            <span>•</span>
-                            <span>Nr. {reminder.contract_number}</span>
-                          </>
-                        )}
-                        {reminder.cancellation_deadline && (
-                          <>
-                            <span>•</span>
-                            <div className="flex items-center gap-1">
-                              <Calendar className="h-3 w-3" />
-                              <span>Frist: {format(new Date(reminder.cancellation_deadline), 'dd.MM.yyyy', { locale: de })}</span>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                      {reminder.sent_date && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Versendet: {format(new Date(reminder.sent_date), 'dd.MM.yyyy', { locale: de })} via {reminder.sent_via}
-                        </p>
-                      )}
                     </div>
-                  </div>
 
-                  {/* Actions */}
-                  {reminder.status === 'offen' && (
-                    <div className="flex items-center gap-2">
+                    {/* Actions */}
+                    {reminder.status === 'offen' && (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleSend(reminder, 'email')}
+                          className="border-border text-muted-foreground hover:border-primary/30 hover:text-primary"
+                        >
+                          <Mail className="h-4 w-4 mr-1" />
+                          E-Mail
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleSend(reminder, 'whatsapp')}
+                          className="border-border text-muted-foreground hover:border-primary/30 hover:text-primary"
+                        >
+                          <MessageSquare className="h-4 w-4 mr-1" />
+                          WhatsApp
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleStatusChange(reminder, 'erledigt')}
+                          className="border-border text-muted-foreground hover:border-emerald-500/30 hover:text-emerald-400"
+                        >
+                          <Check className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
+
+                    {reminder.status === 'versendet' && (
                       <Button
                         size="sm"
-                        variant="outline"
-                        onClick={() => handleSend(reminder, 'email')}
-                        className="border-border text-muted-foreground hover:border-primary/30 hover:text-primary"
-                      >
-                        <Mail className="h-4 w-4 mr-1" />
-                        E-Mail
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleSend(reminder, 'whatsapp')}
-                        className="border-border text-muted-foreground hover:border-primary/30 hover:text-primary"
-                      >
-                        <MessageSquare className="h-4 w-4 mr-1" />
-                        WhatsApp
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
                         onClick={() => handleStatusChange(reminder, 'erledigt')}
-                        className="border-border text-muted-foreground hover:border-emerald-500/30 hover:text-emerald-400"
+                        className="bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30"
                       >
-                        <Check className="h-4 w-4" />
+                        <Check className="h-4 w-4 mr-1" />
+                        Als erledigt markieren
                       </Button>
-                    </div>
-                  )}
-
-                  {reminder.status === 'versendet' && (
-                    <Button
-                      size="sm"
-                      onClick={() => handleStatusChange(reminder, 'erledigt')}
-                      className="bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30"
-                    >
-                      <Check className="h-4 w-4 mr-1" />
-                      Als erledigt markieren
-                    </Button>
-                  )}
-                </div>
-              </Card>
+                    )}
+                  </div>
+                </Card>
+              </motion.div>
             );
           })}
-        </div>
+        </motion.div>
       )}
     </div>
   );

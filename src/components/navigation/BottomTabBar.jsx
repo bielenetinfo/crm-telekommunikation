@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Search, Users, AlertCircle, FileText, MoreHorizontal } from 'lucide-react';
+import { LayoutDashboard, Users, AlertCircle, FileText, MoreHorizontal } from 'lucide-react';
 import { TabBarItem } from './TabBarItem';
 import { cn } from '@/lib/utils';
 import { createPageUrl } from '@/utils';
@@ -16,8 +16,8 @@ export default function BottomTabBar() {
     const tabs = [
         {
             id: 'dashboard',
-            label: 'Suche',
-            icon: Search,
+            label: 'Start',
+            icon: LayoutDashboard,
             route: createPageUrl('Dashboard'),
             badge: 0
         },
@@ -72,7 +72,7 @@ export default function BottomTabBar() {
         <div
             className={cn(
                 'fixed bottom-0 left-0 right-0 z-50',
-                'glass-card border-t border-border',
+                'glass-card border-t border-white/10 shadow-[0_-10px_30px_rgba(0,0,0,0.25)]',
                 'pb-safe', // Safe area for iOS devices
                 'md:hidden' // Hide on tablet/desktop
             )}
@@ -80,7 +80,7 @@ export default function BottomTabBar() {
                 paddingBottom: 'max(env(safe-area-inset-bottom), 0.5rem)',
             }}
         >
-            <div className="flex items-center justify-around max-w-screen-sm mx-auto">
+            <div className="flex items-center justify-around max-w-screen-sm mx-auto px-2">
                 {tabs.map((tab) => (
                     <TabBarItem
                         key={tab.id}

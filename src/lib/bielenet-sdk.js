@@ -7,6 +7,8 @@ const authenticator = new TOTP();
 import {
     createSession,
     isSessionValid,
+    encryptData,
+    decryptData,
     encryptFields,
     decryptFields,
     getEncryptionKey,
@@ -14,13 +16,13 @@ import {
     clearLoginAttempts,
     isLoginLocked
 } from './security.js';
-import { validateCustomerData, validateContractData } from './validators.js';
+import { validateCustomerData, validateContractData, validatePassword } from './validators.js';
 
 // Simulated Database in LocalStorage
 const DB_KEY = 'bielenet_db';
 const AUTH_KEY = 'bielenet_auth';
 const DB_VERSION_KEY = 'bielenet_db_version';
-const DB_VERSION = '1';
+const DB_VERSION = '2';
 
 // Helper to hash password on first use (migration from plaintext)
 const hashPasswordIfNeeded = async (password) => {
@@ -34,7 +36,7 @@ const hashPasswordIfNeeded = async (password) => {
 
 const defaultDb = {
     users: [
-        { id: 'u1', email: 'admin@bielenet.de', password: 'admin', role: 'admin', name: 'Can Arslan', twoFactorSecret: null }
+        { id: 'u1', email: 'admin@bielenet.de', password: bcrypt.hashSync('admin', 10), role: 'admin', name: 'Can Arslan', twoFactorSecret: null }
     ],
     customers: [],
     contracts: [],
@@ -51,6 +53,14 @@ const defaultDb = {
 
 const getDb = () => {
     try {
+        const currentVersion = localStorage.getItem(DB_VERSION_KEY);
+        if (currentVersion !== DB_VERSION) {
+            console.warn(`[bielenet-sdk] DB version mismatch (expected ${DB_VERSION}, found ${currentVersion}). Clearing local storage...`);
+            localStorage.removeItem(DB_KEY);
+            localStorage.removeItem(AUTH_KEY);
+            localStorage.setItem(DB_VERSION_KEY, DB_VERSION);
+        }
+
         const s = localStorage.getItem(DB_KEY);
         const db = s ? JSON.parse(s) : defaultDb;
 
@@ -124,6 +134,20 @@ const saveDb = (db) => {
 
 // --- AUTH MODULE ---
 const auth = {
+    createUser: async (email, password, role = "user", fullName = "") => {
+        if (!validatePassword(password)) {
+            throw new Error("Passwort-Policy verletzt: min 8 Zeichen, 1 Zahl, 1 Sonderzeichen");
+        }
+        const db = getDb();
+        if (db.users.find(u => u.email === email)) {
+            throw new Error("User existiert bereits");
+        }
+        const hashed = await bcrypt.hash(password, 10);
+        const newUser = { id: crypto.randomUUID(), email, password: hashed, role, name: fullName || email, twoFactorSecret: null };
+        db.users.push(newUser);
+        saveDb(db);
+        return { id: newUser.id, email: newUser.email, role: newUser.role, name: newUser.name };
+    },
     me: async () => {
         const sessionStr = localStorage.getItem(AUTH_KEY);
         if (!sessionStr) throw { status: 401 };
@@ -203,15 +227,35 @@ const auth = {
             throw new Error('2FA not enabled for this user');
         }
 
-        const isValid = authenticator.verify({ token, secret: user.twoFactorSecret });
+        // decrypt secret if needed
+        const session = JSON.parse(localStorage.getItem(AUTH_KEY) || '{}');
+        const encKey = session.userId ? getEncryptionKey(session.userId) : null;
+        let secret = user.twoFactorSecret;
+        if (encKey) {
+            const decrypted = decryptData(user.twoFactorSecret, encKey);
+            if (decrypted && decrypted !== user.twoFactorSecret) {
+                secret = decrypted;
+            }
+        }
+
+        const isValid = authenticator.verify({ token, secret });
 
         if (!isValid) {
             throw new Error('Invalid OTP');
         }
 
+        // If secret was stored unencrypted, migrate to encrypted
+        if (encKey && user.twoFactorSecret === secret) {
+            const idx = db.users.findIndex(u => u.id === userId);
+            if (idx !== -1) {
+                db.users[idx].twoFactorSecret = encryptData(secret, encKey);
+                saveDb(db);
+            }
+        }
+
         // Create session with expiration
-        const session = createSession(user.id);
-        localStorage.setItem(AUTH_KEY, JSON.stringify(session));
+        const newSession = createSession(user.id);
+        localStorage.setItem(AUTH_KEY, JSON.stringify(newSession));
         return { success: true, user };
     },
 
@@ -257,8 +301,9 @@ const auth = {
         const userIdx = db.users.findIndex(u => u.id === session.userId);
         if (userIdx === -1) throw new Error('User not found');
 
-        // Save the secret to enable 2FA
-        db.users[userIdx].twoFactorSecret = secret;
+        // Save the secret to enable 2FA (encrypted)
+        const encKey = getEncryptionKey(session.userId);
+        db.users[userIdx].twoFactorSecret = encryptData(secret, encKey);
         saveDb(db);
         return true;
     },
@@ -1069,6 +1114,15 @@ const seed = () => {
         console.log('✅ Database seeded with sample data');
     }
 
+    // Hard wipe of all customer-related data (per request)
+    db.customers = [];
+    db.contracts = [];
+    db.customerHistory = [];
+    db.followups = [];
+    db.activities = [];
+    db.vvlRecords = [];
+    saveDb(db);
+
     if (madeChanges) {
         saveDb(db);
         console.log('✅ Database updated with missing initial data');
@@ -1086,8 +1140,23 @@ seed();
 
 // Specialized Contract Handler with auto-calculation
 const createContractHandler = () => ({
-    list: async (sort) => {
-        const contracts = getDb().contracts || [];
+    list: async (options = {}) => {
+        let contracts = getDb().contracts || [];
+
+        const sort = typeof options === 'string' ? options : options.sort;
+        const search = typeof options === 'object' ? options.search : null;
+
+        if (search) {
+            const term = search.toLowerCase();
+            contracts = contracts.filter(item => {
+                return (
+                    (item.contract_number && item.contract_number.toLowerCase().includes(term)) ||
+                    (item.tariff_name && item.tariff_name.toLowerCase().includes(term)) ||
+                    (item.provider_id && item.provider_id.toLowerCase().includes(term))
+                );
+            });
+        }
+
         if (sort === '-created_date') {
             return contracts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
         }

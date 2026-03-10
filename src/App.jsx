@@ -57,8 +57,8 @@ const App = () => {
             <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
               <Route index element={<Dashboard />} />
               <Route path="customers" element={<Customers />} />
-              <Route path="customers/detail" element={<CustomerDetail />} />
-              <Route path="customers/:id" element={<CustomerDetail />} />
+              <Route path="customers/detail" element={<Customers />} />
+              <Route path="customers/:id" element={<Customers />} />
               <Route path="contracts" element={<Contracts />} />
               <Route path="contracts/detail" element={<ContractDetail />} />
               <Route path="contracts/:id" element={<ContractDetail />} />

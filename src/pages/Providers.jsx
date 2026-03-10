@@ -23,6 +23,20 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { motion } from "framer-motion";
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: { staggerChildren: 0.1 }
+  }
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
+};
 
 const PROVIDER_CATEGORIES = [
   'MOBILFUNK',
@@ -208,7 +222,7 @@ export default function Providers() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-4xl md:text-5xl font-black tracking-tight text-gradient">
+          <h1 className="app-page-title">
             Provider
           </h1>
           <p className="text-sm text-muted-foreground font-medium mt-0.5">
@@ -228,116 +242,135 @@ export default function Providers() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-        <KpiCard icon={Building2} value={providers.length} label="Gesamt Anbieter" color="blue" />
-        <KpiCard icon={CheckCircle2} value={activeProviders} label="Aktive Anbieter" color="green" />
-        <KpiCard icon={XCircle} value={providers.length - activeProviders} label="Inaktiv" color="rose" />
-        <KpiCard icon={Globe} value={providers.filter(p => p.website).length} label="Mit Webseite" color="cyan" />
-      </div>
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="show"
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-6"
+      >
+        <motion.div variants={itemVariants}>
+          <KpiCard icon={Building2} value={providers.length} label="Gesamt Anbieter" color="blue" />
+        </motion.div>
+        <motion.div variants={itemVariants}>
+          <KpiCard icon={CheckCircle2} value={activeProviders} label="Aktive Anbieter" color="green" />
+        </motion.div>
+        <motion.div variants={itemVariants}>
+          <KpiCard icon={XCircle} value={providers.length - activeProviders} label="Inaktiv" color="rose" />
+        </motion.div>
+        <motion.div variants={itemVariants}>
+          <KpiCard icon={Globe} value={providers.filter(p => p.website).length} label="Mit Webseite" color="cyan" />
+        </motion.div>
+      </motion.div>
 
       {/* Provider Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="show"
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+      >
         {providers.map((p) => (
-          <Card
-            key={p.id}
-            onClick={() => openEditDialog(p)}
-            className="glass-card card-premium overflow-hidden group border-transparent hover:border-primary/20 relative cursor-pointer transition-all"
-          >
-            <div className="h-1.5 bg-gradient-to-r from-primary via-orange-400 to-primary/50"></div>
-
-            {/* Edit Icon - top right */}
-            <div className="absolute top-5 right-5 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-              <Pencil className="h-4 w-4 text-primary" />
-            </div>
-
-            {/* Delete Icon - bottom right */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute bottom-4 right-4 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity z-10 hover:bg-rose-500/10 hover:text-rose-400 rounded-lg"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDelete(p);
-              }}
+          <motion.div variants={itemVariants} key={p.id}>
+            <Card
+              onClick={() => openEditDialog(p)}
+              className="glass-card card-premium overflow-hidden group border-transparent hover:border-primary/20 relative cursor-pointer transition-all"
             >
-              <Trash2 className="h-4 w-4" />
-            </Button>
+              <div className="h-1.5 bg-gradient-to-r from-primary via-orange-400 to-primary/50"></div>
 
-            <CardHeader className="pb-4">
-              <div className="flex items-start justify-between">
-                <div className="space-y-1">
-                  <CardTitle className="text-xl text-foreground font-black tracking-tight group-hover:text-primary transition-colors">
-                    {p.name}
-                  </CardTitle>
-                  <div className="flex flex-wrap gap-1.5">
-                    {p.categories?.map(cat => (
-                      <Badge
-                        key={cat}
-                        variant="outline"
-                        className="text-[9px] uppercase tracking-widest font-black border-border text-muted-foreground px-2 py-0"
-                      >
-                        {cat}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-                <Badge
-                  className={cn(
-                    "text-[9px] uppercase tracking-widest font-black border-none px-2",
-                    p.is_active ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500"
-                  )}
-                >
-                  {p.is_active ? 'Aktiv' : 'Inaktiv'}
-                </Badge>
+              {/* Edit Icon - top right */}
+              <div className="absolute top-5 right-5 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                <Pencil className="h-4 w-4 text-primary" />
               </div>
-            </CardHeader>
 
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 gap-2 text-[13px] font-bold">
-                {p.contact_person && (
-                  <div className="flex items-center gap-3 text-muted-foreground">
-                    <div className="w-6 h-6 rounded bg-secondary/50 flex items-center justify-center">
-                      <User className="h-3 w-3" />
+              {/* Delete Icon - bottom right */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute bottom-4 right-4 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity z-10 hover:bg-rose-500/10 hover:text-rose-400 rounded-lg"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDelete(p);
+                }}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+
+              <CardHeader className="pb-4">
+                <div className="flex items-start justify-between">
+                  <div className="space-y-1">
+                    <CardTitle className="text-xl text-foreground font-black tracking-tight group-hover:text-primary transition-colors">
+                      {p.name}
+                    </CardTitle>
+                    <div className="flex flex-wrap gap-1.5">
+                      {p.categories?.map(cat => (
+                        <Badge
+                          key={cat}
+                          variant="outline"
+                          className="text-[9px] uppercase tracking-widest font-black border-border text-muted-foreground px-2 py-0"
+                        >
+                          {cat}
+                        </Badge>
+                      ))}
                     </div>
-                    <span>{p.contact_person}</span>
                   </div>
-                )}
-                <div className="flex gap-2 mt-2">
-                  {p.phone && (
-                    <a
-                      href={`tel:${p.phone}`}
-                      onClick={(e) => e.stopPropagation()}
-                      className="flex-1 flex items-center justify-center gap-2 text-xs bg-secondary/30 hover:bg-primary/10 hover:text-primary py-2 rounded-lg border border-transparent hover:border-primary/20 transition-all"
-                    >
-                      <Phone className="h-3.5 w-3.5" /> Anrufen
-                    </a>
-                  )}
-                  {p.email && (
-                    <a
-                      href={`mailto:${p.email}`}
-                      onClick={(e) => e.stopPropagation()}
-                      className="flex-1 flex items-center justify-center gap-2 text-xs bg-secondary/30 hover:bg-primary/10 hover:text-primary py-2 rounded-lg border border-transparent hover:border-primary/20 transition-all"
-                    >
-                      <Mail className="h-3.5 w-3.5" /> Email
-                    </a>
-                  )}
-                  {p.website && (
-                    <a
-                      href={p.website}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      className="h-9 w-9 flex items-center justify-center bg-secondary/30 hover:bg-primary/10 hover:text-primary rounded-lg border border-transparent hover:border-primary/20 transition-all"
-                    >
-                      <Globe className="h-4 w-4" />
-                    </a>
-                  )}
+                  <Badge
+                    className={cn(
+                      "text-[9px] uppercase tracking-widest font-black border-none px-2",
+                      p.is_active ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500"
+                    )}
+                  >
+                    {p.is_active ? 'Aktiv' : 'Inaktiv'}
+                  </Badge>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardHeader>
+
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 gap-2 text-[13px] font-bold">
+                  {p.contact_person && (
+                    <div className="flex items-center gap-3 text-muted-foreground">
+                      <div className="w-6 h-6 rounded bg-secondary/50 flex items-center justify-center">
+                        <User className="h-3 w-3" />
+                      </div>
+                      <span>{p.contact_person}</span>
+                    </div>
+                  )}
+                  <div className="flex gap-2 mt-2">
+                    {p.phone && (
+                      <a
+                        href={`tel:${p.phone}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex-1 flex items-center justify-center gap-2 text-xs bg-secondary/30 hover:bg-primary/10 hover:text-primary py-2 rounded-lg border border-transparent hover:border-primary/20 transition-all"
+                      >
+                        <Phone className="h-3.5 w-3.5" /> Anrufen
+                      </a>
+                    )}
+                    {p.email && (
+                      <a
+                        href={`mailto:${p.email}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex-1 flex items-center justify-center gap-2 text-xs bg-secondary/30 hover:bg-primary/10 hover:text-primary py-2 rounded-lg border border-transparent hover:border-primary/20 transition-all"
+                      >
+                        <Mail className="h-3.5 w-3.5" /> Email
+                      </a>
+                    )}
+                    {p.website && (
+                      <a
+                        href={p.website}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="h-9 w-9 flex items-center justify-center bg-secondary/30 hover:bg-primary/10 hover:text-primary rounded-lg border border-transparent hover:border-primary/20 transition-all"
+                      >
+                        <Globe className="h-4 w-4" />
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
         ))}
-      </div>
+      </motion.div>
 
       {/* Mobile FAB */}
       {isMobile && (

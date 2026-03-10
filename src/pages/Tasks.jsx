@@ -15,6 +15,19 @@ import { KpiCard } from "@/components/ui/kpi-card";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 
+const containerVariants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: { staggerChildren: 0.1 }
+  }
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
+};
+
 export default function Tasks() {
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
@@ -80,11 +93,11 @@ export default function Tasks() {
   }
 
   return (
-    <div className="space-y-3 px-4 md:px-8 pt-3 md:pt-4 pb-24 w-full text-foreground">
+    <div className="app-page-shell">
       {/* Header - Dashboard Pattern */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-4xl md:text-5xl font-black tracking-tight text-gradient">
+          <h1 className="app-page-title">
             Aufgaben
           </h1>
           <p className="text-sm text-muted-foreground font-medium mt-0.5">
@@ -101,32 +114,25 @@ export default function Tasks() {
       </div>
 
       {/* KPI Cards Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-        <KpiCard
-          icon={ListTodo}
-          value={tasks.length}
-          label="Gesamt Aufgaben"
-          color="blue"
-        />
-        <KpiCard
-          icon={Clock}
-          value={tasks.filter(t => t.status === 'open').length}
-          label="Offen"
-          color="amber"
-        />
-        <KpiCard
-          icon={CheckCheck}
-          value={tasks.filter(t => t.status === 'done').length}
-          label="Erledigt"
-          color="green"
-        />
-        <KpiCard
-          icon={AlertTriangle}
-          value={tasks.filter(t => t.priority === 'dringend').length}
-          label="Dringend"
-          color="rose"
-        />
-      </div>
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="show"
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-6"
+      >
+        <motion.div variants={itemVariants}>
+          <KpiCard icon={ListTodo} value={tasks.length} label="Gesamt Aufgaben" color="blue" />
+        </motion.div>
+        <motion.div variants={itemVariants}>
+          <KpiCard icon={Clock} value={tasks.filter(t => t.status === 'offen').length} label="Offen" color="amber" />
+        </motion.div>
+        <motion.div variants={itemVariants}>
+          <KpiCard icon={CheckCheck} value={tasks.filter(t => t.status === 'erledigt').length} label="Erledigt" color="green" />
+        </motion.div>
+        <motion.div variants={itemVariants}>
+          <KpiCard icon={AlertTriangle} value={tasks.filter(t => t.priority === 'dringend').length} label="Dringend" color="rose" />
+        </motion.div>
+      </motion.div>
 
       {/* Quick Add & Controls */}
       <motion.div
@@ -196,11 +202,11 @@ export default function Tasks() {
         </div>
       </motion.div>
 
-      <div
-
-
-
-        className="space-y-3"
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="show"
+        className="space-y-4 mt-6"
       >
         {filteredTasks.length === 0 ? (
           <motion.div
@@ -218,8 +224,8 @@ export default function Tasks() {
           </motion.div>
         ) : (
           filteredTasks.map((t) => (
-            <div key={t.id}>
-              <Card className="glass-card card-premium overflow-hidden group hover:bg-secondary/30   rounded-2xl border-transparent hover:border-primary/20">
+            <motion.div variants={itemVariants} key={t.id}>
+              <Card className="glass-card card-premium overflow-hidden group hover:-translate-y-1 transition-all duration-300 rounded-2xl border-white/5 hover:border-primary/50 relative">
                 <div className="h-1.5 bg-gradient-to-r from-primary via-orange-400 to-primary/50"></div>
                 <div className="flex items-center p-5 gap-6">
                   <button
@@ -274,10 +280,10 @@ export default function Tasks() {
                   </div>
                 </div>
               </Card>
-            </div>
+            </motion.div>
           ))
         )}
-      </div>
+      </motion.div>
 
       {/* Mobile: FAB */}
       {isMobile && (

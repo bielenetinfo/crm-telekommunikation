@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useNavigate } from 'react-router-dom';
 import { Lock, Mail, ArrowRight, ShieldCheck } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 const LoginPage = () => {
     const [email, setEmail] = useState('admin@bielenet.de');
@@ -30,7 +31,8 @@ const LoginPage = () => {
                 setTempUserId(res.userId);
             }
         } catch (err) {
-            setError('Ungültige Zugangsdaten');
+            console.error('Login Error:', err);
+            setError(err.message || 'Ungültige Zugangsdaten');
         } finally {
             setIsLoading(false);
         }
@@ -57,7 +59,12 @@ const LoginPage = () => {
             <div className="absolute bottom-[-20%] left-[-10%] w-[600px] h-[600px] bg-blue-600/5 rounded-full blur-[100px] pointer-events-none" />
 
             {/* Login Container */}
-            <div className="w-full max-w-md m-auto p-8 relative z-10">
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ type: "spring", stiffness: 300, damping: 24 }}
+                className="w-full max-w-md m-auto p-8 relative z-10"
+            >
                 <div className="text-center mb-10 space-y-2">
                     <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-[#FFD24D] to-orange-500 shadow-2xl shadow-orange-500/20 mb-6">
                         <span className="text-3xl font-bold text-black">B</span>
@@ -166,7 +173,7 @@ const LoginPage = () => {
                         &copy; 2026 CRM-BIELENET System. <br />Made for efficiency.
                     </p>
                 </div>
-            </div>
+            </motion.div>
         </div>
     );
 };

@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ArrowLeft,
   FileText, Save, Upload, AlertTriangle, Euro, Trash2, Download, CheckSquare, Users, Briefcase, ArrowRight, CheckCircle2,
-  Shield, Clock, Zap, CreditCard, IdCard, Sparkles, Info, Plus, MapPin, Loader2
+  Shield, Clock, Zap, CreditCard, IdCard, Sparkles, Info, Plus, MapPin, Loader2, X
 } from "lucide-react";
 import { differenceInDays } from "date-fns";
 import { safeFormatDate, safeParseDate } from "@/lib/dateUtils";
@@ -32,8 +32,14 @@ import { logDocumentUploaded } from "@/components/utils/historyLogger";
 import { FloatingActionButton } from "@/components/ui/floating-action-button";
 import { useIsMobile } from "@/lib/hooks/useMediaQuery";
 import { validateCustomerData } from "@/lib/validators";
+import { motion } from "framer-motion";
 
-export default function CustomerDetail() {
+const pageVariants = {
+  hidden: { opacity: 0, y: 10 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.3 } }
+};
+
+export default function CustomerDetail({ isSplitView = false }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
@@ -494,7 +500,17 @@ export default function CustomerDetail() {
   };
 
   return (
-    <div className="space-y-10 px-4 md:px-8 pt-3 md:pt-4 pb-24 w-full max-w-[1600px]">
+    <motion.div
+      variants={pageVariants}
+      initial="hidden"
+      animate="visible"
+      className={cn(
+        "w-full",
+        isSplitView
+          ? "max-w-none space-y-6 px-4 md:px-5 xl:px-6 py-4 md:py-5 pb-28"
+          : "app-detail-shell lg:space-y-10"
+      )}
+    >
       {/* Next Steps Dialog */}
       {showNextSteps && (
         <Card className="p-6 bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 border-2 border-emerald-500/50">
@@ -544,27 +560,29 @@ export default function CustomerDetail() {
       )}
 
       {/* Header */}
-      <div className="flex items-center gap-6">
+      <div className={cn("flex flex-wrap items-start", isSplitView ? "gap-3" : "gap-3 md:gap-4")}>
         <Button
           variant="ghost"
           size="icon"
           onClick={() => navigate(createPageUrl('Customers'))}
-          className="h-12 w-12 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all"
+          className={cn("rounded-2xl bg-secondary/50 border border-transparent hover:bg-primary/10 hover:border-primary/20 hover:text-primary transition-all", isSplitView ? "h-10 w-10 flex-shrink-0" : "h-12 w-12")}
         >
-          <ArrowLeft className="h-6 w-6 text-muted-foreground" />
+          {isSplitView ? <X className="h-5 w-5" /> : <ArrowLeft className="h-6 w-6 text-muted-foreground" />}
         </Button>
-        <div className="flex-1">
-          <h1 className="text-4xl md:text-5xl font-black tracking-tight text-gradient">
+        <div className="flex-1 min-w-0">
+          <h1 className={cn("font-black tracking-tight text-gradient truncate", isSplitView ? "text-3xl" : "app-page-title")}>
             {isNew ? "Neuer Kunde" : getCustomerDisplayName()}
           </h1>
-          <p className="text-sm font-medium text-muted-foreground mt-1">
-            {isNew ? "Kundendaten erfassen" : "Kundendetails und Verträge im Überblick"}
-          </p>
+          {!isSplitView && (
+            <p className="app-page-subtitle">
+              {isNew ? "Kundendaten erfassen" : "Kundendetails und Verträge im Überblick"}
+            </p>
+          )}
         </div>
 
         {/* Desktop: Action Buttons - Mobile: FAB */}
         {!isNew && !isMobile && (
-          <div className="flex items-center gap-3">
+          <div className={cn("flex items-center gap-2 md:gap-3 flex-wrap", isSplitView ? "justify-end max-w-full ml-auto" : "md:justify-end")}>
             <Button
               onClick={() => {
                 if (confirm('Kunde wirklich löschen? Alle zugehörigen Verträge bleiben erhalten.')) {
@@ -572,7 +590,7 @@ export default function CustomerDetail() {
                 }
               }}
               variant="outline"
-              className="h-12 px-6 rounded-xl border-rose-500/30 text-rose-400 hover:bg-rose-500/10 font-semibold"
+              className={cn("rounded-xl border-rose-500/30 text-rose-400 hover:bg-rose-500/10 font-semibold", isSplitView ? "h-10 px-3 text-xs" : "h-12 px-6")}
             >
               <Trash2 className="h-4 w-4 mr-2" />
               Löschen
@@ -580,7 +598,7 @@ export default function CustomerDetail() {
             <Button
               onClick={() => navigate(`${createPageUrl('ContractDetail')}?new=true&customer_id=${customerId}`)}
               variant="outline"
-              className="h-12 px-6 rounded-xl border-primary/30 text-primary hover:bg-primary/10 font-semibold"
+              className={cn("rounded-xl border-primary/30 text-primary hover:bg-primary/10 font-semibold", isSplitView ? "h-10 px-3 text-xs" : "h-12 px-6")}
             >
               <Plus className="h-4 w-4 mr-2" />
               Vertrag
@@ -588,7 +606,7 @@ export default function CustomerDetail() {
             <Button
               onClick={handleSubmit}
               disabled={updateMutation.isPending}
-              className="btn-premium bg-primary text-primary-foreground font-bold h-12 px-8 rounded-xl shadow-lg shadow-primary/20"
+              className={cn("btn-premium bg-primary text-primary-foreground font-bold rounded-xl shadow-lg shadow-primary/20", isSplitView ? "h-10 px-4 text-xs" : "h-12 px-8")}
             >
               <Save className="h-4 w-4 mr-2" />
               Speichern
@@ -599,44 +617,44 @@ export default function CustomerDetail() {
 
       {/* Stats (nur bei bestehendem Kunden) */}
       {!isNew && customer && (
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+        <div className={cn("grid gap-3", isSplitView ? "grid-cols-2 2xl:grid-cols-5" : "grid-cols-1 md:grid-cols-2 xl:grid-cols-5")}>
           <button
             onClick={() => {
               const contractsTab = document.querySelector('[value="contracts"]');
               if (contractsTab) contractsTab.click();
             }}
-            className="text-left p-5 glass-card card-premium border-transparent rounded-xl hover:border-[#FFD24D]/30 transition-all"
+            className={cn("text-left glass-card card-premium border-transparent rounded-xl hover:border-[#FFD24D]/30 transition-all", isSplitView ? "p-4" : "p-5")}
           >
             <p className="text-xs text-muted-foreground mb-1">Aktive Verträge</p>
-            <p className="text-3xl font-bold text-foreground">{activeContracts.length}</p>
+            <p className={cn("font-bold text-foreground", isSplitView ? "text-2xl" : "text-3xl")}>{activeContracts.length}</p>
           </button>
-          <div className="p-5 glass-card card-premium border-transparent rounded-xl">
+          <div className={cn("glass-card card-premium border-transparent rounded-xl", isSplitView ? "p-4" : "p-5")}>
             <p className="text-xs text-muted-foreground mb-1">Monatliche Gebühren</p>
-            <p className="text-3xl font-bold text-foreground">{totalMonthlyFees.toFixed(2)} €</p>
+            <p className={cn("font-bold text-foreground", isSplitView ? "text-2xl" : "text-3xl")}>{totalMonthlyFees.toFixed(2)} €</p>
           </div>
-          <div className="p-5 glass-card card-premium border-transparent rounded-xl">
+          <div className={cn("glass-card card-premium border-transparent rounded-xl", isSplitView ? "p-4" : "p-5")}>
             <p className="text-xs text-muted-foreground mb-1">Gesamtprovision</p>
-            <p className="text-3xl font-bold text-[#FFD24D]">{totalCommission.toFixed(2)} €</p>
+            <p className={cn("font-bold text-[#FFD24D]", isSplitView ? "text-2xl" : "text-3xl")}>{totalCommission.toFixed(2)} €</p>
           </div>
           <button
             onClick={() => {
               const historyTab = document.querySelector('[value="history"]');
               if (historyTab) historyTab.click();
             }}
-            className="text-left p-5 bg-amber-500/10 border border-amber-500/30 rounded-xl hover:border-amber-500/50 transition-all"
+            className={cn("text-left bg-amber-500/10 border border-amber-500/30 rounded-xl hover:border-amber-500/50 transition-all", isSplitView ? "p-4" : "p-5")}
           >
             <p className="text-xs text-amber-400 mb-1">Offene Follow-ups</p>
-            <p className="text-3xl font-bold text-amber-400">{getOpenFollowups(history).length}</p>
+            <p className={cn("font-bold text-amber-400", isSplitView ? "text-2xl" : "text-3xl")}>{getOpenFollowups(history).length}</p>
           </button>
           <button
             onClick={() => {
               const historyTab = document.querySelector('[value="history"]');
               if (historyTab) historyTab.click();
             }}
-            className="text-left p-5 bg-indigo-500/10 border border-indigo-500/30 rounded-xl hover:border-indigo-500/50 transition-all"
+            className={cn("text-left bg-indigo-500/10 border border-indigo-500/30 rounded-xl hover:border-indigo-500/50 transition-all", isSplitView ? "p-4" : "p-5")}
           >
             <p className="text-xs text-indigo-400 mb-1">Termine</p>
-            <p className="text-3xl font-bold text-indigo-400">{getAppointments(history).length}</p>
+            <p className={cn("font-bold text-indigo-400", isSplitView ? "text-2xl" : "text-3xl")}>{getAppointments(history).length}</p>
           </button>
         </div>
       )}
@@ -878,7 +896,7 @@ export default function CustomerDetail() {
 
               {/* Schritt 2: DSGVO */}
               {creationStep === 2 && (
-                <Card className="p-6 bg-[#181B21] border-[#2D3139]">
+                <Card className="app-form-panel p-6">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-lg font-semibold text-foreground">
                       Schritt 2: Rechtssichere Einwilligung
@@ -1104,25 +1122,33 @@ export default function CustomerDetail() {
             </div>
           </div>
           :
-          <Tabs defaultValue="info" className="space-y-6">
-            <TabsList className="glass-card card-premium border-transparent">
-              <TabsTrigger value="info" className="data-[state=active]:bg-[#FFD24D] data-[state=active]:text-[#0F1115]">
-                Kundendaten
-              </TabsTrigger>
-              <TabsTrigger value="contracts" className="data-[state=active]:bg-[#FFD24D] data-[state=active]:text-[#0F1115]">
-                Verträge ({contracts.length})
-              </TabsTrigger>
-              <TabsTrigger value="history" className="data-[state=active]:bg-[#FFD24D] data-[state=active]:text-[#0F1115]">
-                Historie ({history.length})
-              </TabsTrigger>
-              <TabsTrigger value="documents" className="data-[state=active]:bg-[#FFD24D] data-[state=active]:text-[#0F1115]">
-                Dokumente ({identityDocs.length + (customer?.dsgvo_document_url ? 1 : 0)})
-              </TabsTrigger>
-            </TabsList>
+          <Tabs defaultValue="info" className="space-y-4 md:space-y-6">
+            <div
+              className={cn(
+                "glass-card card-premium border-transparent rounded-2xl p-1 overflow-x-auto",
+                "sticky z-20 bg-background/85 backdrop-blur-xl shadow-lg shadow-black/10",
+                isSplitView ? "top-[58px]" : "top-0"
+              )}
+            >
+              <TabsList className="bg-transparent border-none h-auto p-0 inline-flex min-w-max gap-1">
+                <TabsTrigger value="info" className="data-[state=active]:bg-[#FFD24D] data-[state=active]:text-[#0F1115] rounded-xl px-3 py-2 whitespace-nowrap">
+                  Kundendaten
+                </TabsTrigger>
+                <TabsTrigger value="contracts" className="data-[state=active]:bg-[#FFD24D] data-[state=active]:text-[#0F1115] rounded-xl px-3 py-2 whitespace-nowrap">
+                  Verträge ({contracts.length})
+                </TabsTrigger>
+                <TabsTrigger value="history" className="data-[state=active]:bg-[#FFD24D] data-[state=active]:text-[#0F1115] rounded-xl px-3 py-2 whitespace-nowrap">
+                  Historie ({history.length})
+                </TabsTrigger>
+                <TabsTrigger value="documents" className="data-[state=active]:bg-[#FFD24D] data-[state=active]:text-[#0F1115] rounded-xl px-3 py-2 whitespace-nowrap">
+                  Dokumente ({identityDocs.length + (customer?.dsgvo_document_url ? 1 : 0)})
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
             <TabsContent value="info">
               <div className="space-y-6">
-                <Card className="p-6 bg-[#181B21] border-[#2D3139]">
+                <Card className="app-form-panel p-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {customer?.customer_type === "privat" ? (
                       <>
@@ -1310,7 +1336,7 @@ export default function CustomerDetail() {
                   {contracts.map(contract => (
                     <Card
                       key={contract.id}
-                      className="p-5 bg-[#181B21] border-[#2D3139] hover:border-[#FFD24D]/30 transition-all"
+                      className="app-form-panel p-5 hover:border-[#FFD24D]/30 transition-all"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div
@@ -1400,7 +1426,7 @@ export default function CustomerDetail() {
                 </div>
 
                 {/* Timeline */}
-                <Card className="p-6 bg-[#181B21] border-[#2D3139]">
+                <Card className="app-form-panel p-6">
                   <TimelineV2
                     events={history}
                     onEventClick={(event) => {
@@ -1513,7 +1539,7 @@ export default function CustomerDetail() {
                 </Card>
 
                 {/* DSGVO Dokument - als abgeschlossener Meilenstein */}
-                <Card className="p-6 bg-[#181B21] border-[#2D3139]">
+                <Card className="app-form-panel p-6">
                   <div className="flex items-center gap-3 mb-4">
                     <div className={cn(
                       "h-10 w-10 rounded-xl flex items-center justify-center",
@@ -1637,7 +1663,7 @@ export default function CustomerDetail() {
                 </Card>
 
                 {/* Weitere Dokumente - als Optimierungsbereich */}
-                <Card className="p-6 bg-[#181B21] border-[#2D3139]">
+                <Card className="app-form-panel p-6">
                   <div className="flex items-center gap-3 mb-2">
                     <div className="h-10 w-10 rounded-xl bg-[#FFD24D]/20 flex items-center justify-center">
                       <Sparkles className="h-5 w-5 text-[#FFD24D]" />
@@ -1796,6 +1822,6 @@ export default function CustomerDetail() {
         customerType={customerType}
         addressData={addressData}
       />
-    </div>
+    </motion.div>
   );
 }
