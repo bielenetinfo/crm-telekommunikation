@@ -118,7 +118,17 @@ export const REQUIRED_CUSTOMER_FIELDS_BY_PHASE = {
 };
 
 export const getCustomerLifecycleChecklist = (data = {}, phase = CUSTOMER_LIFECYCLE_PHASES.LEAD) => {
-    const required = REQUIRED_CUSTOMER_FIELDS_BY_PHASE[phase] || REQUIRED_CUSTOMER_FIELDS_BY_PHASE[CUSTOMER_LIFECYCLE_PHASES.LEAD];
+    const baseRequired = REQUIRED_CUSTOMER_FIELDS_BY_PHASE[phase] || REQUIRED_CUSTOMER_FIELDS_BY_PHASE[CUSTOMER_LIFECYCLE_PHASES.LEAD];
+    const isBusinessCustomer = data.customer_type === 'geschäftlich';
+
+    const required = isBusinessCustomer
+        ? baseRequired
+            .map((field) => (field.key === 'first_name' || field.key === 'last_name'
+                ? { key: 'company_name', label: 'Firmenname' }
+                : field))
+            .filter((field, index, list) => list.findIndex((item) => item.key === field.key) === index)
+        : baseRequired;
+
     return required.map((field) => ({
         ...field,
         complete: isPresent(data[field.key])
