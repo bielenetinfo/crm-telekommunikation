@@ -388,6 +388,7 @@ export default function CustomerDetail({ isSplitView = false }) {
     const normalizedAddress = `${addressData.street} ${addressData.house_number}`.trim();
     const checklistSource = {
       ...formData,
+      customer_type: customerType,
       address: normalizedAddress,
       postal_code: addressData.postal_code,
       city: addressData.city,
@@ -514,6 +515,7 @@ export default function CustomerDetail({ isSplitView = false }) {
   const activeContracts = contracts.filter(c => c.status === CONTRACT_STATUS.ACTIVE);
   const customerChecklist = getCustomerLifecycleChecklist({
     ...formData,
+    customer_type: customerType,
     address: `${addressData.street} ${addressData.house_number}`.trim(),
     postal_code: addressData.postal_code,
     city: addressData.city,
